@@ -3243,7 +3243,7 @@ async function renderMyCalculations() {
     document.getElementById("myCalcPicker").innerHTML = `
       <div class="table-card" style="margin-bottom:18px;">
         <div class="table-title">Кімнің есептеулерін көрсету</div>
-        <select id="myCalcUserSelect" style="width:100%;max-width:420px;padding:12px;border-radius:8px;border:1px solid rgba(225,180,52,.4);background:#1c1433;color:#f5f0df;">
+        <select id="myCalcUserSelect" style="width:100%;max-width:420px;padding:12px;border-radius:8px;border:1px solid rgba(225,180,52,.4);background:#1c332f;color:#f5f0df;">
           <option value="">Барлық платформа (барлық пайдаланушылар)</option>
           ${(users || []).map((u) => `<option value="${escapeHtml(u.id)}">${escapeHtml((u.last_name || "") + " " + (u.first_name || "") + " — " + (u.email || ""))}</option>`).join("")}
         </select>
