@@ -967,7 +967,7 @@ function reduceTo22Diag(n) {
 
 // Традиционные цвета чакр — используются и в главной диаграмме, и в карте здоровья.
 const CHAKRA_COLOR = {
-  sahasrara: "#6bb5b0", // фиолетовый
+  sahasrara: "#9b6bd6", // фиолетовый
   adjna: "#5b8ef2",     // синий
   vishudha: "#4fc3c0",  // голубой
   anahata: "#6fbf5e",   // зелёный
@@ -1542,7 +1542,7 @@ function renderAdultMatrixResult(name, birthDate, container) {
   let editKeyCounter = 0;
   function editableDiv(text) {
     const key = "adult-" + (editKeyCounter++);
-    return `<div class="editable-text" contenteditable="false" data-key="${key}" style="margin:0 0 18px;padding:6px;border-radius:6px;outline:none;">${escapeHtml(text)}</div>`;
+    return `<div class="editable-text" contenteditable="false" data-key="${key}" style="margin:0 0 10px;padding:2px 6px;border-radius:6px;outline:none;">${escapeHtml(text)}</div>`;
   }
 
   const programsHtml = res.programs.length
@@ -1559,12 +1559,12 @@ function renderAdultMatrixResult(name, birthDate, container) {
     const body = block.entries.map(function (e) {
       const numLabel1265 = typeof e.number === "number" ? String(e.number) : (typeof e.number === "string" ? e.number.trim() : "");
       const numberLine = numLabel1265
-        ? `<p style="color:#f6d66c;font-family:Georgia,serif;font-size:20px;margin:0 0 4px;">${escapeHtml(numLabel1265)}</p>`
+        ? `<p style="color:#f6d66c;font-family:Georgia,serif;font-size:20px;margin:0 0 2px;">${escapeHtml(numLabel1265)}</p>`
         : "";
       return `${numberLine}${editableDiv(e.text)}`;
     }).join("");
     rasshifrovkaHtml += accordionItem(block.title, body);
-    if (block.title.toLowerCase().startsWith("материалдық карма")) {
+    if (block.title.toLowerCase().includes("қарыз")) {
       rasshifrovkaHtml += programsHtml;
       rasshifrovkaHtml += buildForecastHtml(birthDate);
     }
@@ -1577,7 +1577,7 @@ function renderAdultMatrixResult(name, birthDate, container) {
       return `<p style="margin:0 0 14px;">${escapeHtml(t)}</p>`;
     }).join("");
     const entriesHtml = block.entries.map(function (e) {
-      return `<p style="color:#f6d66c;font-family:Georgia,serif;font-size:18px;margin:0 0 4px;">${escapeHtml(e.axis)}: ${escapeHtml(String(e.number))}</p>${editableDiv(e.text)}`;
+      return `<p style="color:#f6d66c;font-family:Georgia,serif;font-size:18px;margin:0 0 2px;">${escapeHtml(e.axis)}: ${escapeHtml(String(e.number))}</p>${editableDiv(e.text)}`;
     }).join("");
     const color = CHAKRA_COLORS[i] || "#9aa0a6";
     const id = nextId();
@@ -1779,7 +1779,7 @@ async function downloadAdultMatrixMobile(name, birthDate) {
       { phys: v.a1, energy: v.b1, emo: l2 }, { phys: v.a3, energy: v.b3, emo: l3 },
       { phys: v.e, energy: v.e, emo: l4 }, { phys: v.c1, energy: v.d1, emo: l5 }, { phys: v.c, energy: v.d, emo: l6 },
     ];
-    const CHAKRA_HEX = ["#6bb5b0", "#5b8ef2", "#4fc3c0", "#6fbf5e", "#e0c23e", "#e0913e", "#d1483e"];
+    const CHAKRA_HEX = ["#9b6bd6", "#5b8ef2", "#4fc3c0", "#6fbf5e", "#e0c23e", "#e0913e", "#d1483e"];
     const healthRows = chakras.map((ch, i) => ({ title: CHAKRA_NAMES[i], physics: ch.phys, energy: ch.energy, emotion: ch.emo, color: CHAKRA_HEX[i] }));
     healthRows.push({
       title: "Қорытынды",
@@ -1995,7 +1995,7 @@ function downloadAdultMatrixText(name, birthDate) {
     block.entries.forEach(function (e) {
       bodyHtml += `<div class="entry-block"><div class="num">${escapeHtml(String(e.number))}</div>${textToHtml(editedTexts[cursor++] ?? e.text)}</div>`;
     });
-    if (block.title.toLowerCase().startsWith("материалдық карма")) {
+    if (block.title.toLowerCase().includes("қарыз")) {
       bodyHtml += programsBlockHtml();
       bodyHtml += forecastBlockHtml();
     }
@@ -2168,9 +2168,9 @@ function renderEditableResult(blocks, container, personLabel, dateLabel, calcula
     const entriesHtml = block.entries.map(function (e, eIdx) {
       const numLabel = typeof e.number === "number" ? String(e.number) : (typeof e.number === "string" ? e.number.trim() : "");
       const numberLine = numLabel
-        ? `<p style="color:#f6d66c;font-family:Georgia,serif;font-size:20px;margin:0 0 4px;">${escapeHtml(numLabel)}</p>`
+        ? `<p style="color:#f6d66c;font-family:Georgia,serif;font-size:20px;margin:0 0 2px;">${escapeHtml(numLabel)}</p>`
         : "";
-      return `${numberLine}<div class="editable-text" contenteditable="false" data-block="${bIdx}" data-entry="${eIdx}" style="margin:0 0 14px;padding:6px;border-radius:6px;outline:none;">${escapeHtml(e.text)}</div>`;
+      return `${numberLine}<div class="editable-text" contenteditable="false" data-block="${bIdx}" data-entry="${eIdx}" style="margin:0 0 10px;padding:2px 6px;border-radius:6px;outline:none;">${escapeHtml(e.text)}</div>`;
     }).join("");
     const id = nextId();
     return `
@@ -3029,10 +3029,14 @@ async function openLibraryLinksView() {
   const contentCards = document.getElementById("contentCards");
   if (!contentCards) return;
   contentCards.className = "";
+  const isAdmin = isRealAdminUser();
   contentCards.innerHTML = `
     <div class="materials-page">
       <button class="back-link" onclick="loadLibrary()">← Артқа</button>
-      <div class="materials-head"><h2>Нумеролог кітапханасы</h2></div>
+      <div class="materials-head">
+        <h2>Нумеролог кітапханасы</h2>
+        ${isAdmin ? `<button class="materials-add-btn" onclick="showLibraryLinkManager('', '', '')">Кітап қосу +</button>` : ""}
+      </div>
       <div id="libraryListBox">Жүктелуде...</div>
     </div>`;
   await loadLibraryLinksList();
@@ -3051,7 +3055,7 @@ async function loadLibraryLinksList() {
     currentLibraryLinks = data || [];
     const isAdmin = isRealAdminUser();
 
-    box.innerHTML = currentLibraryLinks.map(function (item) {
+    box.innerHTML = currentLibraryLinks.length ? currentLibraryLinks.map(function (item) {
       const hasUrl = !!item.url;
       return `
         <div class="material-row">
@@ -3061,9 +3065,9 @@ async function loadLibraryLinksList() {
             <div class="material-row-meta">${hasUrl ? escapeHtml(item.url) : "Сілтеме әлі қосылмаған"}</div>
           </div>
           ${hasUrl ? `<button class="material-row-open" onclick='openLibraryLink(${JSON.stringify(item.id)})'>Ашу</button>` : ""}
-          ${isAdmin ? `<button class="material-row-open" style="margin-left:8px;" onclick='showLibraryLinkManager(${JSON.stringify(item.id)},${JSON.stringify(item.title)},${JSON.stringify(item.url || "")})'>${hasUrl ? "Изменить ссылку" : "Сілтеме кірістіру"}</button>` : ""}
+          ${isAdmin ? `<button class="material-row-open" style="margin-left:8px;" onclick='showLibraryLinkManager(${JSON.stringify(item.id)},${JSON.stringify(item.title)},${JSON.stringify(item.url || "")})'>${hasUrl ? "Сілтемені өзгерту" : "Сілтеме кірістіру"}</button>` : ""}
         </div>`;
-    }).join("");
+    }).join("") : `<div class="table-card"><div class="empty-table">Кітапхана әлі бос.</div></div>`;
   } catch (error) {
     console.error("Ошибка загрузки библиотеки:", error);
     box.innerHTML = `<div class="table-card"><div class="empty-table">Кітапхананы жүктеу мүмкін болмады.</div></div>`;
@@ -3081,18 +3085,23 @@ function showLibraryLinkManager(id, title, existingUrl) {
   const old = document.getElementById("libraryLinkManager");
   if (old) old.remove();
 
+  const isNew = !id;
   const box = document.createElement("div");
   box.id = "libraryLinkManager";
   box.innerHTML = `
     <div class="material-manager-overlay">
       <div class="material-manager">
         <button class="material-manager-close" onclick="document.getElementById('libraryLinkManager').remove()">×</button>
-        <h2>${escapeHtml(title)}</h2>
+        <h2>${isNew ? "Жаңа кітап қосу" : escapeHtml(title)}</h2>
+
+        ${isNew ? `
+        <label class="material-manager-label">Кітаптың атауы</label>
+        <input id="libraryLinkTitleInput" class="material-manager-input" type="text" placeholder="Кітаптың атауын енгізіңіз">` : ""}
 
         <label class="material-manager-label">Сілтеме</label>
         <input id="libraryLinkUrlInput" class="material-manager-input" type="url" placeholder="https://..." value="${escapeHtml(existingUrl || "")}">
 
-        <button id="saveLibraryLinkButton" class="material-manager-button" onclick='saveLibraryLink(${JSON.stringify(id)})'>🔗 Сілтемені сақтау</button>
+        <button id="saveLibraryLinkButton" class="material-manager-button" onclick='saveLibraryLink(${JSON.stringify(id || "")})'>🔗 Сілтемені сақтау</button>
 
         <div id="libraryLinkManagerStatus" class="material-manager-status"></div>
       </div>
@@ -3108,15 +3117,18 @@ function setLibraryLinkManagerStatus(text, type) {
 }
 
 async function saveLibraryLink(id) {
-  console.log("saveLibraryLink called", id, "isAdmin:", isRealAdminUser(), "role:", window.currentUserRole);
   if (!isRealAdminUser()) {
-    setLibraryLinkManagerStatus("Только әкімші может редактировать библиотеку.", "error");
+    setLibraryLinkManagerStatus("Тек әкімші кітапхананы өзгерте алады.", "error");
     return;
   }
   const urlInput = document.getElementById("libraryLinkUrlInput");
   const url = urlInput?.value.trim() || "";
+  const isNew = !id;
+  const titleInput = document.getElementById("libraryLinkTitleInput");
+  const title = isNew ? (titleInput?.value.trim() || "") : "";
 
-  if (!url) { setLibraryLinkManagerStatus("Вставьте ссылку.", "error"); return; }
+  if (isNew && !title) { setLibraryLinkManagerStatus("Кітаптың атауын енгізіңіз.", "error"); return; }
+  if (!url) { setLibraryLinkManagerStatus("Сілтеме кірістіріңіз.", "error"); return; }
   try { new URL(url); } catch (_) {
     setLibraryLinkManagerStatus("https:// немесе http://-дан басталатын дұрыс сілтеме енгізіңіз", "error");
     return;
@@ -3127,16 +3139,22 @@ async function saveLibraryLink(id) {
   setLibraryLinkManagerStatus("Сілтемені сақтап жатырмын...", "");
 
   try {
-    const { data, error } = await supabaseClient.from(LIBRARY_LINKS_TABLE).update({ url }).eq("id", id).select();
-    if (error) throw error;
-    if (!data || !data.length) throw new Error("Запись не найдена или нет прав на изменение.");
+    if (isNew) {
+      const { data, error } = await supabaseClient.from(LIBRARY_LINKS_TABLE).insert({ title, url }).select();
+      if (error) throw error;
+      if (!data || !data.length) throw new Error("Жазба сақталмады.");
+    } else {
+      const { data, error } = await supabaseClient.from(LIBRARY_LINKS_TABLE).update({ url }).eq("id", id).select();
+      if (error) throw error;
+      if (!data || !data.length) throw new Error("Жазба табылмады немесе өзгертуге құқық жоқ.");
+    }
 
-    setLibraryLinkManagerStatus("Сілтеме сохранена.", "ok");
+    setLibraryLinkManagerStatus("Сілтеме сақталды.", "ok");
     await loadLibraryLinksList();
     setTimeout(() => document.getElementById("libraryLinkManager")?.remove(), 700);
   } catch (error) {
-    console.error("Ошибка сохранения ссылки:", error);
-    setLibraryLinkManagerStatus("Не удалось сохранить ссылку: " + (error.message || error), "error");
+    console.error("Сілтемені сақтау қатесі:", error);
+    setLibraryLinkManagerStatus("Сілтемені сақтау мүмкін болмады: " + (error.message || error), "error");
   } finally {
     if (saveButton) saveButton.disabled = false;
   }
