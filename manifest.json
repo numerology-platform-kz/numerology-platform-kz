@@ -1,0 +1,17 @@
+{
+  "name": "Numerology Platform KZ",
+  "short_name": "Numerology KZ",
+  "description": "Нумерология платформасы — ересек матрица, бала матрицасы, үйлесімділік матрицасы",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#142b28",
+  "theme_color": "#1d3f3c",
+  "lang": "kk",
+  "icons": [
+    { "src": "icon-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

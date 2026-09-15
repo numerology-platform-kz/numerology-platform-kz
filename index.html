@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1d3f3c">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Numerology Platform">
+<meta name="apple-mobile-web-app-title" content="Numerology Platform KZ">
 <style>
 * {
   box-sizing: border-box;
@@ -468,7 +468,7 @@ body {
     </div>
 
     <button class="nav-item logout" onclick="logoutUser()">
-      <span class="nav-icon">🚪</span> Выйти
+      <span class="nav-icon">🚪</span> Шығу
     </button>
 
     <div style="text-align:left;margin-top:10px;padding-left:16px;font-size:11px;line-height:1.8;">
@@ -556,8 +556,8 @@ function showNoAccessMessage() {
    ============================================================ */
 
 const DIRECTIONS = [
-  { key: "adult",         icon: "✦",   title: "Ересек<br>матрица" },
-  { key: "child",         icon: "👶",  title: "Бала<br>матрица" },
+  { key: "adult",         icon: "✦",   title: "Ересек<br>матрицасы" },
+  { key: "child",         icon: "👶",  title: "Бала<br>матрицасы" },
   { key: "compatibility", icon: "💕",  title: "Үйлесімділік<br>матрицасы" }
 ];
 const DIRECTION_NAMES = Object.fromEntries(DIRECTIONS.map(d => [d.key, d.title.replace("<br>", " ")]));
@@ -922,12 +922,12 @@ function calculate(type) {
 
   if (type === "adult" && window.AdultMatrixEngine) {
     renderAdultMatrixResult(name, birthDate, result);
-    saveCalculationHistory({ direction: "adult", title: "Ересек матрица - " + name + " - " + birthDate, personName: name, birthDate });
+    saveCalculationHistory({ direction: "adult", title: "Ересек матрицасы - " + name + " - " + birthDate, personName: name, birthDate });
     return;
   }
   if (type === "child" && window.ChildMatrixEngine) {
     renderChildMatrixResult(name, birthDate, result);
-    saveCalculationHistory({ direction: "child", title: "Балалар матрицасы - " + name + " - " + birthDate, personName: name, birthDate });
+    saveCalculationHistory({ direction: "child", title: "Бала матрицасы - " + name + " - " + birthDate, personName: name, birthDate });
     return;
   }
   if (type === "vedic" && window.VedicEngine) {
@@ -1832,8 +1832,8 @@ async function downloadAdultMatrixMobile(name, birthDate) {
       });
     }
 
-    const filename = "Ересек матрица - " + name + " - " + birthDate + ".pdf";
-    const title = "Ересек матрица — " + name + " (" + birthDate + ")";
+    const filename = "Ересек матрицасы - " + name + " - " + birthDate + ".pdf";
+    const title = "Ересек матрицасы — " + name + " (" + birthDate + ")";
     const fullRasshifrovka = blocksToPayload(res.rasshifrovka);
     const fullHealth = blocksToPayload(res.health);
 
@@ -1947,7 +1947,7 @@ function downloadAdultMatrixText(name, birthDate) {
     .join("");
 
   let bodyHtml = `<div class="diagram-wrap">${extraBlocksHtml}</div>`;
-  bodyHtml += `<h1>Ересек матрица — ${escapeHtml(name)} (${escapeHtml(birthDate)})</h1>`;
+  bodyHtml += `<h1>Ересек матрицасы — ${escapeHtml(name)} (${escapeHtml(birthDate)})</h1>`;
 
   function textToHtml(text) {
     // Переносы строк внутри текста превращаем в настоящие абзацы, а не склеиваем всё подряд.
@@ -2009,7 +2009,7 @@ function downloadAdultMatrixText(name, birthDate) {
     });
   });
 
-  downloadHtmlFile("Ересек матрица - " + name + " - " + birthDate + ".html", bodyHtml);
+  downloadHtmlFile("Ересек матрицасы - " + name + " - " + birthDate + ".html", bodyHtml);
 }
 
 async function confirmInterruptTest() {
@@ -2426,7 +2426,7 @@ function renderChildMatrixResult(name, birthDate, container) {
     return;
   }
 
-  renderEditableResult(res.rasshifrovka, container, "Балалар матрицасы - " + name, birthDate, "child");
+  renderEditableResult(res.rasshifrovka, container, "Бала матрицасы - " + name, birthDate, "child");
   window._lastChildMatrixResult = res;
   renderMatrixDiamondDiagram(window.ChildMatrixEngine, container, true, 2);
 }
@@ -2877,10 +2877,12 @@ function showMaterialManager(section, direction, title) {
         <input id="materialUrlInput" class="material-manager-input" type="url" placeholder="https://...">
         <button id="saveMaterialUrlButton" class="material-manager-button" onclick="savePlatformMaterialUrl()">🔗 Сілтемені сақтау</button>
 
-        <div class="material-manager-or">или</div>
+        <div class="material-manager-or">немесе</div>
 
         <label class="material-manager-label">Файл жүктеу</label>
-        <input id="materialFileInput" class="material-manager-input" type="file" accept="${accept}">
+        <input id="materialFileInput" style="display:none;" type="file" accept="${accept}" onchange="document.getElementById('materialFileNameLabel').textContent = this.files[0] ? this.files[0].name : 'Файл таңдалмады';">
+        <button type="button" class="material-manager-button" style="background:linear-gradient(90deg,#3c8783,#4c9d98);margin-bottom:8px;" onclick="document.getElementById('materialFileInput').click()">📁 Файл таңдау</button>
+        <div id="materialFileNameLabel" style="color:#c9baa0;font-size:13px;margin-bottom:14px;">Файл таңдалмады</div>
         <button id="uploadMaterialFileButton" class="material-manager-button" onclick="uploadPlatformMaterialFile()">📁 Файл жүктеу</button>
 
         <div class="material-manager-hint">
@@ -3780,7 +3782,7 @@ async function loadAdminUsers() {
             <td>${user.created_at ? new Date(user.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</td>
             ${isRealAdmin ? `${codeCell}<td>${user.role === "student" ? escapeHtml(teacherName(user.teacher_id)) : "—"}</td>` : ""}
             <td>${statusLabel(user.status)}${user.restored_at ? ` <span style="color:#8fd18f;font-size:11px;">(восстановлен ${new Date(user.restored_at).toLocaleDateString("ru-RU")})</span>` : ""}${accessBadge(user)}</td>
-            ${user.role === "admin" ? (isRealAdmin ? "<td>—</td>" : "") : `<td><button type="button" class="material-manager-button" style="width:auto;padding:6px 10px;font-size:12px;" onclick='deleteUserAccount(${JSON.stringify(user.id)}, ${JSON.stringify(nameOf(user))})'>Удалить</button></td>`}
+            ${user.role === "admin" ? (isRealAdmin ? "<td>—</td>" : "") : `<td><button type="button" class="material-manager-button" style="width:auto;padding:6px 10px;font-size:12px;" onclick='deleteUserAccount(${JSON.stringify(user.id)}, ${JSON.stringify(nameOf(user))})'>Жою</button></td>`}
           </tr>`;
         }).join("")}
       </tbody>
@@ -3817,7 +3819,7 @@ function deleteUserAccount(userId, name) {
     <div id="deleteModalMessage" style="margin:10px 0;"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button type="button" class="material-manager-button" style="width:auto;background:transparent;border:1px solid rgba(225,180,52,.4);" onclick="closeModal()">Бас тарту</button>
-      <button type="button" id="confirmDeleteBtn" class="material-manager-button" style="width:auto;background:#a33;" onclick='confirmDeleteUser(${JSON.stringify(userId)})'>Удалить</button>
+      <button type="button" id="confirmDeleteBtn" class="material-manager-button" style="width:auto;background:#a33;" onclick='confirmDeleteUser(${JSON.stringify(userId)})'>Жою</button>
     </div>
   `);
 }
@@ -4290,7 +4292,7 @@ async function renderStatistics() {
         <div class="table-title">Тесттер бойынша статистика</div>
         <div style="max-width:340px;margin-bottom:14px;">
           <label style="display:block;color:#8a8098;font-size:13px;margin-bottom:6px;">Оқушы бойынша көрсету</label>
-          <select id="testStatsUserFilter" class="material-manager-input" style="margin-bottom:0;" onchange="renderTestStatsTable()"><option value="">Все</option></select>
+          <select id="testStatsUserFilter" class="material-manager-input" style="margin-bottom:0;" onchange="renderTestStatsTable()"><option value="">Барлығы</option></select>
         </div>
         <div id="testStatsTable">Жүктелуде...</div>
       </div>
@@ -4348,7 +4350,7 @@ async function renderStatistics() {
     const filterSelect = document.getElementById("testStatsUserFilter");
     if (filterSelect) {
       const seen = new Set();
-      const options = ["<option value=\"\">Все</option>"];
+      const options = ["<option value=\"\">Барлығы</option>"];
       (attempts || []).forEach(a => {
         if (seen.has(a.user_id)) return;
         seen.add(a.user_id);
@@ -4476,7 +4478,7 @@ function showLogin(message = "") {
         <input id="loginPassword" type="password" placeholder="Құпия сөз">
         <button type="button" onclick="loginUser()">Кіру</button>
         <button class="auth-link" type="button" onclick="showForgotPassword()">Құпия сөзді ұмыттыңыз ба?</button>
-        <div class="auth-divider">или</div>
+        <div class="auth-divider">немесе</div>
         <button class="auth-register" type="button" onclick="showRegister()">Тіркелу</button>
         <div id="loginError" class="auth-message error">${escapeHtml(message)}</div>
       </div>
@@ -4837,6 +4839,12 @@ async function checkAuth() {
 }
 
 document.addEventListener("DOMContentLoaded", checkAuth);
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch((error) => console.error("Service Worker тіркеу қатесі:", error));
+  });
+}
 </script>
 </body>
 </html>
