@@ -2500,7 +2500,7 @@ async function openTestDirection(direction, title) {
     }
 
     box.innerHTML = `
-      <p style="color:#eee5d0;">Вопросов в тесте: ${count}. В каждом вопросе один правильный вариант из четырёх. Можно возвращаться к предыдущим вопросам и менять ответ, пока тест не завершён.</p>
+      <p style="color:#eee5d0;">Тестте ${count} сұрақ бар. Әр сұрақта төрт нұсқаның біреуі ғана дұрыс. Тест аяқталғанша алдыңғы сұрақтарға қайта оралып, жауапты өзгертуге болады.</p>
       <button class="material-manager-button" style="width:auto;" onclick='startTest(${JSON.stringify(direction)},${JSON.stringify(title)})'>Тестті бастау</button>
       ${historyHtml}`;
   } catch (error) {
@@ -2573,7 +2573,7 @@ function renderTestQuestion() {
               background:${i === currentIndex ? "#d7aa31" : (answers[qq.id] ? "rgba(215,170,49,.35)" : "rgba(0,0,0,.15)")};
               color:${i === currentIndex ? "#122522" : "#f8e7a8"};">${i + 1}</button>`).join("")}
         </div>
-        <div style="color:#8a8098;font-size:13px;margin-top:8px;">Отвечено: ${answeredCount} из ${total}</div>
+        <div style="color:#8a8098;font-size:13px;margin-top:8px;">Жауап берілді: ${answeredCount} / ${total}</div>
       </div>`);
 }
 
@@ -2879,11 +2879,11 @@ function showMaterialManager(section, direction, title) {
 
         <div class="material-manager-or">немесе</div>
 
-        <label class="material-manager-label">Файл жүктеу</label>
+        <label class="material-manager-label">Файл</label>
         <input id="materialFileInput" style="display:none;" type="file" accept="${accept}" onchange="document.getElementById('materialFileNameLabel').textContent = this.files[0] ? this.files[0].name : 'Файл таңдалмады';">
         <button type="button" class="material-manager-button" style="background:linear-gradient(90deg,#3c8783,#4c9d98);margin-bottom:8px;" onclick="document.getElementById('materialFileInput').click()">📁 Файл таңдау</button>
         <div id="materialFileNameLabel" style="color:#c9baa0;font-size:13px;margin-bottom:14px;">Файл таңдалмады</div>
-        <button id="uploadMaterialFileButton" class="material-manager-button" onclick="uploadPlatformMaterialFile()">📁 Файл жүктеу</button>
+        <button id="uploadMaterialFileButton" class="material-manager-button" onclick="uploadPlatformMaterialFile()">⬆️ Жүктеу</button>
 
         <div class="material-manager-hint">
           ${isVideo
@@ -3020,8 +3020,8 @@ function loadLibrary() {
       <div class="card library-main-card" onclick="openLibraryLinksView()" role="button" tabindex="0">
         <div class="card-icon library-icon">📚</div>
         <div class="card-content">
-          <h3>Кітапхана<br>нумерологтың</h3>
-          <p>Нумерология бойынша кітаптар<br>және эзотерикаға қатысты</p>
+          <h3>Нумеролог<br>кітапханасы</h3>
+          <p>Нумерология бойынша кітаптар</p>
         </div>
       </div>
     </div>`;
