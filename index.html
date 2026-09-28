@@ -432,6 +432,11 @@ body {
 
 
 body, body * { font-variant-numeric: lining-nums; }
+
+@media (max-width: 600px) {
+  body > div[style*="min-height:100vh"][style*="padding:40px"] { padding: 10px !important; }
+  body > div[style*="min-height:100vh"] > div[style*="padding:35px"] { padding: 16px 12px !important; border-radius: 14px !important; }
+}
 </style>
 </head>
 <body>
@@ -850,7 +855,7 @@ async function openCalculator(type) {
 
   document.body.innerHTML = `
     <div style="min-height:100vh;padding:40px;background:linear-gradient(135deg,#142b28,#1d3f3c,#142b28);color:#f8e7a8;font-family:Arial,sans-serif;">
-      <div style="max-width:${type === "moonsun" ? "1100px" : "650px"};margin:0 auto;padding:35px;border:1px solid #d7aa31;border-radius:20px;background:linear-gradient(145deg,#24504c,#1c3a37);">
+      <div style="max-width:${type === "moonsun" ? "1100px" : type === "adult" ? "900px" : "650px"};margin:0 auto;padding:35px;border:1px solid #d7aa31;border-radius:20px;background:linear-gradient(145deg,#24504c,#1c3a37);">
         <h1 style="margin-top:0;color:#f6d66c;font-family:PT Serif,Georgia,serif;font-weight:500;">${title}</h1>
 
         <label>Аты</label>
@@ -1053,7 +1058,53 @@ const CHAKRA_COLOR = {
   neutral: "#8a7fae",
 };
 
-function buildDiagramSvgMarkup(engine, sheetName, rowOffset, svgSize, omitAncestral, hideLineageLabels) {
+// Кольцо прогноза: те же значения, что в разделе «Прогноз» (buildForecastTable), разложенные по возрастам.
+// Все подписи горизонтальные: числа — снаружи восьмиугольника, возраст — внутри, на одинаковом расстоянии от линии.
+function buildForecastRingSvg(engine, positions, mid) {
+  const anchors = getForecastAnchors(engine);
+  const table = buildForecastTable(anchors, 80);
+  const order = ["a", "f", "b", "g", "c", "y", "d", "k"]; // 0, 10, 20 … 70 лет
+  const numColor = "#e9dfc6", numStrong = "#f6d66c", ageColor = "#9fb8b2", lineColor = "rgba(233,223,198,.75)";
+  const font = "Arial,Helvetica,sans-serif";
+  const fmt = (s) => String(s).replace(/\./g, ",");
+  const anchorFor = (nx) => nx > 0.35 ? "start" : nx < -0.35 ? "end" : "middle";
+  let lines = "", labels = "";
+  // Восьмиугольник прогноза — снаружи матрицы: большие кружки остаются внутри и не пересекаются линиями кольца
+  const R = Math.hypot(positions.a.x - mid, positions.a.y - mid);
+  const k = (R + 34) / R;
+  const V = order.map(key => ({ x: mid + (positions[key].x - mid) * k, y: mid + (positions[key].y - mid) * k }));
+  for (let d = 0; d < 8; d++) {
+    const p1 = V[d], p2 = V[(d + 1) % 8];
+    const ex = p2.x - p1.x, ey = p2.y - p1.y, len = Math.hypot(ex, ey);
+    // внешняя нормаль к ребру (от центра)
+    let nx = ey / len, ny = -ex / len;
+    const cx = (p1.x + p2.x) / 2 - mid, cy = (p1.y + p2.y) / 2 - mid;
+    if (nx * cx + ny * cy < 0) { nx = -nx; ny = -ny; }
+    const r0 = 0.07;
+    lines += `<line class="fr-line" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${lineColor}" stroke-width="1"/>`;
+    for (let i = 1; i < 8; i++) {
+      const row = table[d * 8 + i];
+      const t = r0 + (1 - 2 * r0) * (i / 8);
+      const x = p1.x + ex * t, y = p1.y + ey * t;
+      const isFive = i === 4;
+      lines += isFive
+        ? `<circle class="fr-five" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6" fill="#1c3a37" stroke="${lineColor}" stroke-width="1.1"/>`
+        : `<circle class="fr-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.6" fill="${lineColor}"/>`;
+      const ox = x + nx * 7, oy = y + ny * 7 + (ny > 0.35 ? 6 : ny < -0.35 ? 0 : 3);
+      labels += `<text class="${isFive ? "fr-num5" : "fr-num"}" x="${ox.toFixed(1)}" y="${oy.toFixed(1)}" text-anchor="${anchorFor(nx)}" font-family="${font}" font-size="${isFive ? 10.5 : 9.5}" font-weight="${isFive ? 700 : 400}" fill="${isFive ? numStrong : numColor}">${row.energy1}</text>`;
+      const ageText = isFive ? `${d * 10 + 5} жас` : fmt(row.label.replace(/ (лет|жас)$/, ""));
+      const ix = x - nx * 6, iy = y - ny * 6 + (-ny > 0.35 ? 5 : -ny < -0.35 ? 0 : 2);
+      labels += `<text class="${isFive ? "fr-age5" : "fr-age"}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" text-anchor="${anchorFor(-nx)}" font-family="${font}" font-size="${isFive ? 6.4 : 5.4}" font-weight="${isFive ? 700 : 400}" fill="${isFive ? numColor : ageColor}">${ageText}</text>`;
+    }
+    // подпись десятилетия у вершины, снаружи
+    const vx = p1.x - mid, vy = p1.y - mid, vl = Math.hypot(vx, vy);
+    lines += `<circle class="fr-dot" cx="${p1.x.toFixed(1)}" cy="${p1.y.toFixed(1)}" r="1.8" fill="${lineColor}"/>`;
+    labels += `<text class="fr-dec" x="${(p1.x + vx / vl * 14).toFixed(1)}" y="${(p1.y + vy / vl * 14 + 3).toFixed(1)}" text-anchor="middle" font-family="${font}" font-size="8" font-weight="700" fill="${numColor}">${d * 10} жас</text>`;
+  }
+  return { lines, labels };
+}
+
+function buildDiagramSvgMarkup(engine, sheetName, rowOffset, svgSize, omitAncestral, hideLineageLabels, withForecast) {
   // omitAncestral: false/undefined = все точки; true = совсем без f/g/k/y и их подточек;
   // "corners" = f/g/k/y (углы) есть, но БЕЗ подточек (s1/s2/p1/p2/p3/p4/s3/s4) и без e1/e2.
   const omitCorners = omitAncestral === true;
@@ -1108,9 +1159,10 @@ function buildDiagramSvgMarkup(engine, sheetName, rowOffset, svgSize, omitAncest
   // Расположение вдоль линии — равными долями, независимо от исходных координат в Excel (те нужны только для значений).
   // mid = истинный центр viewBox (410/2=205, 240/2=120) — раньше был сдвинут на +20/+10,
   // из-за чего точки c и d (справа и снизу) вылезали за край и обрезались.
-  const mid = svgSize === "small" ? 120 : 205;
+  const bigRing = withForecast && svgSize !== "small" && omitAncestral !== true;
+  const mid = svgSize === "small" ? 120 : bigRing ? 250 : 205;
   // Все 8 углов (a,b,c,d,f,g,k,y) — на одной окружности, равное расстояние от центра.
-  const R1 = svgSize === "small" ? 100 : 175;
+  const R1 = svgSize === "small" ? 100 : bigRing ? 222 : 175;
   const R2 = R1;
 
   function polar(angleDeg, radius) {
@@ -1243,24 +1295,40 @@ function buildDiagramSvgMarkup(engine, sheetName, rowOffset, svgSize, omitAncest
   const subSvg = subKeys.map(k => circle(positions[k], values[k], 9 * rScale, 8.5 * rScale, pointColor[k])).join("");
   const centerSvg = circle(positions.e, values.e, 18 * rScale, 14 * rScale, pointColor.e);
 
-  const viewSize = svgSize === "small" ? 240 : 410;
-  const svg = `<svg viewBox="0 0 ${viewSize} ${viewSize}" style="width:100%;max-width:${svgSize === "small" ? 250 : 420}px;">
-      ${outerSquareLines}${innerDiamondLines}${axisLines}${lineageLines}${lineageLabels}${wellbeingLine}${dollarSign}${heartSign}${centerSvg}${subSvg}${outerSvg}${mainSvg}
+  const viewSize = svgSize === "small" ? 240 : bigRing ? 500 : 410;
+  const inner = `${outerSquareLines}${innerDiamondLines}${axisLines}${lineageLines}${lineageLabels}${wellbeingLine}${dollarSign}${heartSign}${centerSvg}${subSvg}${outerSvg}${mainSvg}`;
+  let svg;
+  if (withForecast && svgSize !== "small" && !omitCorners) {
+    // Кольцо прогноза по возрастам вокруг матрицы: восьмиугольник через 8 внешних точек (0, 10, 20 … 70 лет)
+    const pad = 64, full = viewSize + pad * 2;
+    const ring = buildForecastRingSvg(engine, positions, mid);
+    svg = `<div class="matrix-ring-scroll" style="overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;">
+      <div class="matrix-ring-inner" style="max-width:860px;margin:0 auto;">
+      <svg viewBox="${-pad} ${-pad} ${full} ${full}" width="${full}" height="${full}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;aspect-ratio:1 / 1;display:block;">
+      ${ring.lines}${inner}${ring.labels}
+    </svg></div></div>
+    <button type="button" class="matrix-ring-hint" onclick="toggleMatrixRingZoom(this)" style="display:none;margin:10px auto 0;padding:9px 16px;border:1px solid #d7aa31;border-radius:10px;background:rgba(0,0,0,.2);color:#f6d66c;font-size:14px;cursor:pointer;">🔍 Диаграмманы үлкейту</button>`;
+  } else {
+    svg = `<svg viewBox="0 0 ${viewSize} ${viewSize}" style="width:100%;max-width:${svgSize === "small" ? 250 : 420}px;">
+      ${inner}
     </svg>`;
+  }
 
   return { svg, values };
 }
 
 function renderMatrixDiamondDiagram(engine, container, includeHealthMap, purposeCount) {
-  const result = buildDiagramSvgMarkup(engine, "Диаграмма", 0, "large");
+  const result = buildDiagramSvgMarkup(engine, "Диаграмма", 0, "large", false, false, engine === window.AdultMatrixEngine);
   if (!result) return;
   const { svg, values } = result;
   window._lastDiagramValues = values;
 
   const box = document.createElement("div");
-  box.style.cssText = "max-width:380px;margin:0 auto 20px;text-align:center;";
+  box.style.cssText = "max-width:" + (engine === window.AdultMatrixEngine ? 860 : 380) + "px;margin:0 auto 20px;text-align:center;";
+  box.className = "dl-matrix-box";
   box.innerHTML = `<div style="color:#c9bfa8;font-size:14px;margin-bottom:10px;">Матрица диаграммасы</div>${svg}`;
   container.insertBefore(box, container.firstChild);
+  centerMatrixRingScroll(box);
 
   let afterNode = box;
   if (includeHealthMap !== false) {
@@ -1268,6 +1336,27 @@ function renderMatrixDiamondDiagram(engine, container, includeHealthMap, purpose
     afterNode = box.nextSibling;
   }
   renderPurposeDiagram(values, container, afterNode, purposeCount);
+}
+
+// На телефоне диаграмма сначала видна целиком; кнопка «Увеличить» делает её крупной (листается пальцем)
+function centerMatrixRingScroll(root) {
+  (root || document).querySelectorAll(".matrix-ring-scroll").forEach(function (el) {
+    const btn = el.parentNode.querySelector(".matrix-ring-hint");
+    if (btn && el.clientWidth < 600) btn.style.display = "block";
+  });
+}
+
+function toggleMatrixRingZoom(btn) {
+  const scroll = btn.parentNode.querySelector(".matrix-ring-scroll");
+  const inner = scroll && scroll.querySelector(".matrix-ring-inner");
+  if (!inner) return;
+  const zoomed = inner.style.minWidth === "780px";
+  inner.style.minWidth = zoomed ? "" : "780px";
+  btn.textContent = zoomed ? "🔍 Диаграмманы үлкейту" : "↩ Толық көрсету (саусақпен жылжытыңыз)";
+  if (!zoomed) {
+    scroll.scrollLeft = (scroll.scrollWidth - scroll.clientWidth) / 2;
+    scroll.scrollIntoView({ block: "nearest" });
+  }
 }
 
 function renderHealthMapDiagram(v, container, afterNode) {
@@ -1313,10 +1402,11 @@ function renderHealthMapDiagram(v, container, afterNode) {
 
   const box = document.createElement("div");
   box.style.cssText = "max-width:420px;margin:0 auto 30px;";
+  box.className = "dl-health-box";
   box.innerHTML = `
-    <div style="color:#c9bfa8;font-size:14px;margin-bottom:10px;text-align:center;">Денсаулық картасы</div>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;color:#eee5d0;border:1px solid rgba(225,180,52,.25);">
-      <thead><tr style="color:#8a8098;font-size:11px;"><td style="padding:6px 8px 6px 25px;border:1px solid rgba(225,180,52,.25);">Чакры</td><td style="text-align:center;border:1px solid rgba(225,180,52,.25);">Физика</td><td style="text-align:center;border:1px solid rgba(225,180,52,.25);">Энергия</td><td style="text-align:center;border:1px solid rgba(225,180,52,.25);">Эмоциялар</td></tr></thead>
+    <div class="dl-health-title" style="color:#c9bfa8;font-size:14px;margin-bottom:10px;text-align:center;">Денсаулық картасы</div>
+    <table class="dl-health-table" style="width:100%;border-collapse:collapse;font-size:13px;color:#eee5d0;border:1px solid rgba(225,180,52,.25);">
+      <thead><tr style="color:#8a8098;font-size:11px;"><td style="padding:6px 8px 6px 25px;border:1px solid rgba(225,180,52,.25);">Чакралар</td><td style="text-align:center;border:1px solid rgba(225,180,52,.25);">Физика</td><td style="text-align:center;border:1px solid rgba(225,180,52,.25);">Энергия</td><td style="text-align:center;border:1px solid rgba(225,180,52,.25);">Эмоциялар</td></tr></thead>
       <tbody>${rowsHtml}</tbody>
     </table>`;
   container.insertBefore(box, afterNode.nextSibling);
@@ -1336,25 +1426,26 @@ function renderPurposeDiagram(diagramValues, container, afterNode, count) {
 
   function item(title, formula, result) {
     return `
-      <div style="width:180px;text-align:center;">
-        <div style="color:#f6d66c;font-family:PT Serif,Georgia,serif;font-size:13px;margin-bottom:6px;">${title}</div>
-        <div style="color:#fff;font-family:PT Serif,Georgia,serif;font-size:20px;">${result}</div>
-        <div style="color:#8a8098;font-size:11px;">(${formula})</div>
+      <div class="dl-purpose-item" style="width:180px;text-align:center;">
+        <div class="dl-pt" style="color:#f6d66c;font-family:PT Serif,Georgia,serif;font-size:13px;margin-bottom:6px;">${title}</div>
+        <div class="dl-pr" style="color:#fff;font-family:PT Serif,Georgia,serif;font-size:20px;">${result}</div>
+        <div class="dl-pf" style="color:#a9bdb8;font-size:11px;">(${formula})</div>
       </div>`;
   }
 
-  const items = [item("Жеке миссия", `Небо ${nebo} + Земля ${zemlya}`, pred1)];
-  if (count >= 2 && pred2 != null) items.push(item("Әлеуметтік миссия", `Муж. линия ${muzh} + Жен. линия ${zhen}`, pred2));
-  if (count >= 3 && pred3 != null) items.push(item("Рухани миссия", `Личное ${pred1} + Социальное ${pred2}`, pred3));
-  if (count >= 4 && pred4 != null) items.push(item("Планетарлық миссия", `Социальное ${pred2} + Духовное ${pred3}`, pred4));
+  const items = [item("Жеке миссия", `Аспан ${nebo} + Жер ${zemlya}`, pred1)];
+  if (count >= 2 && pred2 != null) items.push(item("Әлеуметтік миссия", `Ер желісі ${muzh} + Әйел желісі ${zhen}`, pred2));
+  if (count >= 3 && pred3 != null) items.push(item("Рухани миссия", `Жеке ${pred1} + Әлеуметтік ${pred2}`, pred3));
+  if (count >= 4 && pred4 != null) items.push(item("Планетарлық миссия", `Әлеуметтік ${pred2} + Рухани ${pred3}`, pred4));
 
   const rows = [];
   for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
 
   const box = document.createElement("div");
   box.style.cssText = "max-width:420px;margin:0 auto 30px;";
-  box.innerHTML = rows.map(function (row) {
-    return `<div style="display:flex;justify-content:center;gap:24px;margin-bottom:16px;">${row.join("")}</div>`;
+  box.className = "dl-purpose-box";
+  box.innerHTML = `<div class="dl-purpose-heading" style="display:none;">Тағдыр мақсаты</div>` + rows.map(function (row) {
+    return `<div class="dl-purpose-row" style="display:flex;justify-content:center;gap:24px;margin-bottom:16px;">${row.join("")}</div>`;
   }).join("");
   container.insertBefore(box, afterNode.nextSibling);
 }
@@ -1393,12 +1484,12 @@ function forecastFmtAge(n) {
 
 function forecastLabel(decadeStart, entry) {
   if (entry.range) {
-    return `${forecastFmtAge(decadeStart + entry.range[0])}-${forecastFmtAge(decadeStart + entry.range[1])} лет`;
+    return `${forecastFmtAge(decadeStart + entry.range[0])}-${forecastFmtAge(decadeStart + entry.range[1])} жас`;
   }
   if (entry.pos === 0) {
-    return decadeStart === 0 ? "0/80 жас" : `${decadeStart} лет`;
+    return decadeStart === 0 ? "0/80 жас" : `${decadeStart} жас`;
   }
-  return `${decadeStart + entry.pos} лет`;
+  return `${decadeStart + entry.pos} жас`;
 }
 
 // Строит полную таблицу периодов от 0 до maxAge (по умолчанию с запасом до 90 лет).
@@ -1426,7 +1517,7 @@ function buildForecastTable(anchors, maxAge) {
       });
     });
   }
-  rows.push({ pos: decades * 10, label: (decades * 10) === 80 ? "0/80 жас" : `${decades * 10} лет`, energy1: anchors[decades % 8] });
+  rows.push({ pos: decades * 10, label: (decades * 10) === 80 ? "0/80 жас" : `${decades * 10} жас`, energy1: anchors[decades % 8] });
 
   // 2-я энергия: значение первой энергии на точке ±40 лет (по кругу), 3-я — сумма первых двух.
   const perDecade = FORECAST_TEMPLATE.length; // 8
@@ -1736,6 +1827,42 @@ function downloadHtmlFile(filename, htmlBody) {
       .editable-text { color: #1c332f !important; }
       tr, td, img { break-inside: avoid; }
       svg { max-width: 100%; height: auto; }
+      /* Диаграмма матрицы с кольцом прогноза: без прокрутки, тёмные цвета на белом */
+      .matrix-ring-scroll { overflow: visible !important; }
+      .matrix-ring-inner { min-width: 0 !important; max-width: 680px !important; }
+      .matrix-ring-scroll svg { width: 100% !important; height: auto !important; }
+      .matrix-ring-hint { display: none !important; }
+      .fr-line { stroke: #5b516e !important; }
+      .fr-dot { fill: #5b516e !important; }
+      .fr-five { fill: #fff !important; stroke: #5b516e !important; }
+      .fr-num { fill: #2b2238 !important; }
+      .fr-num5 { fill: #9a6a00 !important; }
+      .fr-age { fill: #5b516e !important; }
+      .fr-age5, .fr-dec { fill: #2b2238 !important; }
+      [stroke^="rgba(225,180,52"] { stroke: #b58a22 !important; }
+      [stroke^="rgba(120,110,150"] { stroke: #6f6488 !important; }
+      [stroke^="rgba(210,70,70"], [stroke^="rgba(200,60,60"] { stroke: #c0392b !important; }
+      [stroke^="rgba(120,80,190"] { stroke: #6b4bb0 !important; }
+      [stroke^="rgba(140,200,90"] { stroke: #4f8f2f !important; }
+      [fill^="rgba(120,80,190"] { fill: #6b4bb0 !important; }
+      [fill^="rgba(200,60,60"] { fill: #c0392b !important; }
+      /* Страница 1 — диаграмма матрицы; страница 2 — карта здоровья и предназначение */
+      .diagram-wrap:has(.dl-matrix-box) { break-inside: auto; }
+      .dl-matrix-box { break-after: page; page-break-after: always; break-inside: avoid; margin-bottom: 0 !important; }
+      .dl-health-box, .dl-purpose-box { break-inside: avoid; page-break-inside: avoid; }
+      /* Страница 2: крупная карта здоровья и отдельные карточки предназначения */
+      .dl-health-box { max-width: 620px !important; margin: 6px auto 0 !important; }
+      .diagram-wrap .dl-health-title, .diagram-wrap .dl-purpose-heading { display: block !important; color: #5d2789 !important; font-family: PT Serif, Georgia, serif; font-size: 21px !important; margin: 0 0 16px !important; text-align: center; }
+      .dl-health-table { font-size: 16px !important; }
+      .dl-health-table td { padding: 11px 14px !important; border-color: #d9c38a !important; font-size: 16px !important; }
+      .dl-health-table thead td { font-size: 14px !important; font-weight: 700; background: #f5eee0; }
+      .dl-health-table span[style*="border-radius:50%"] { width: 13px !important; height: 13px !important; }
+      .dl-purpose-box { max-width: 620px !important; margin: 44px auto 0 !important; padding-top: 30px; border-top: 1px solid #d7aa31; }
+      .dl-purpose-row { gap: 22px !important; margin-bottom: 22px !important; }
+      .dl-purpose-item { width: 290px !important; border: 1px solid #d7aa31; border-radius: 12px; padding: 16px 12px; background: #fbf7ee; }
+      .dl-pt { font-size: 16px !important; margin-bottom: 8px !important; }
+      .diagram-wrap .dl-pr { font-size: 32px !important; color: #5d2789 !important; font-weight: 700; margin-bottom: 6px; }
+      .dl-pf { font-size: 12px !important; }
       .ms-table-scroll { overflow: visible !important; border: none !important; }
       .ms-table { min-width: 0 !important; width: 100% !important; table-layout: auto; }
       .ms-table th, .ms-table td { padding: 6px 4px !important; font-size: 9.5px !important; line-height: 1.3 !important; border: 1px solid #cdbb8a !important; }
@@ -1886,10 +2013,10 @@ async function downloadAdultMatrixMobile(name, birthDate) {
     const pred2 = (muzh != null && zhen != null) ? reduceTo22(muzh + zhen) : null;
     const pred3 = pred2 != null ? reduceTo22(pred1 + pred2) : null;
     const pred4 = pred3 != null ? reduceTo22(pred2 + pred3) : null;
-    const purposeItems = [{ title: "Жеке миссия", formula: `Небо ${nebo} + Земля ${zemlya}`, result: pred1 }];
-    if (pred2 != null) purposeItems.push({ title: "Әлеуметтік миссия", formula: `Муж. линия ${muzh} + Жен. линия ${zhen}`, result: pred2 });
-    if (pred3 != null) purposeItems.push({ title: "Рухани миссия", formula: `Личное ${pred1} + Социальное ${pred2}`, result: pred3 });
-    if (pred4 != null) purposeItems.push({ title: "Планетарлық миссия", formula: `Социальное ${pred2} + Духовное ${pred3}`, result: pred4 });
+    const purposeItems = [{ title: "Жеке миссия", formula: `Аспан ${nebo} + Жер ${zemlya}`, result: pred1 }];
+    if (pred2 != null) purposeItems.push({ title: "Әлеуметтік миссия", formula: `Ер желісі ${muzh} + Әйел желісі ${zhen}`, result: pred2 });
+    if (pred3 != null) purposeItems.push({ title: "Рухани миссия", formula: `Жеке ${pred1} + Әлеуметтік ${pred2}`, result: pred3 });
+    if (pred4 != null) purposeItems.push({ title: "Планетарлық миссия", formula: `Әлеуметтік ${pred2} + Рухани ${pred3}`, result: pred4 });
 
     const svgEl = document.querySelector("#result svg");
     const diagramPng = svgEl ? await svgElementToPngDataUrl(svgEl) : null;
@@ -4798,7 +4925,7 @@ function showLanding() {
       <div class="lp-grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));">
         ${directions.map(d => `<div class="lp-card"><div class="ic">${d.icon}</div><h3>${d.title}</h3><p>${d.text}</p></div>`).join("")}
       </div>
-      <p style="text-align:center;color:#a9bdb8;margin-top:16px;">Жаңа бағыттар үнемі қосылып отырады.</p>
+      <p style="text-align:center;color:#a9bdb8;margin-top:16px;">Болашақта басқа әдістер де қосылады.</p>
 
       <div class="lp-h2">Платформада не бар</div>
       <div class="lp-grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));">
@@ -4862,7 +4989,7 @@ function runTrialMatrix() {
   let res, diagram;
   try {
     res = window.AdultMatrixEngine.getFullResult(day, month, year, name);
-    diagram = buildDiagramSvgMarkup(window.AdultMatrixEngine, "Диаграмма", 0, "large");
+    diagram = buildDiagramSvgMarkup(window.AdultMatrixEngine, "Диаграмма", 0, "large", false, false, true);
   } catch (e) {
     console.error("Байқау есептеуінің қатесі:", e);
     err.textContent = "Есептеу орындалмады.";
@@ -4880,7 +5007,7 @@ function runTrialMatrix() {
   window._trialDownload = {
     title: "Тағдыр матрицасы - " + name + " (" + birthDate + ") - байқау нұсқасы",
     body: `<h1>Тағдыр матрицасы: ${escapeHtml(name)}, ${escapeHtml(birthDate)}</h1>
-      <div style="max-width:420px;margin:0 auto 20px;">${diagram ? diagram.svg : ""}</div>
+      <div style="max-width:680px;margin:0 auto 20px;">${diagram ? diagram.svg : ""}</div>
       ${card ? `<h2>${escapeHtml(card.title)}</h2>` + card.entries.map(function (e) {
         const num = typeof e.number === "number" ? String(e.number) : String(e.number || "").trim();
         return (num ? `<div class="num">${escapeHtml(num)}</div>` : "") + `<p>${escapeHtml(e.text).replace(/\n/g, "<br>")}</p>`;
@@ -4890,7 +5017,7 @@ function runTrialMatrix() {
 
   out.innerHTML = `
     <div style="margin-top:24px;">
-      <div style="max-width:420px;margin:0 auto 20px;text-align:center;">
+      <div style="max-width:860px;margin:0 auto 20px;text-align:center;">
         <div style="color:#c9bfa8;font-size:14px;margin-bottom:10px;">Матрица диаграммасы</div>${diagram ? diagram.svg : ""}
       </div>
       ${card ? `<div class="lp-open"><h3>${escapeHtml(card.title)}</h3>${cardHtml}</div>` : ""}
@@ -4900,6 +5027,7 @@ function runTrialMatrix() {
         <button type="button" class="lp-btn ghost" onclick="showRegister()">Толық нұсқаны ашу</button>
       </div>
     </div>`;
+  centerMatrixRingScroll(out);
   out.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
