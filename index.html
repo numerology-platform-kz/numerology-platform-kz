@@ -4901,6 +4901,9 @@ async function fetchLandingContact() {
 // Карточка «Моя ссылка для клиентов» в разделе «Доступы».
 // Учитель и ученик настраивают только себя, администратор — любого пользователя (выбор по email).
 async function injectReferralCard() {
+  // Ссылка для клиентов — только у тех, кому выдан доступ к платформе (и у администратора).
+  // Только что зарегистрированный без доступа видит в «Доступах» лишь поле для кода учителя.
+  if (window.currentUserRole !== "admin" && !window.currentUserHasAccess) return;
   const wrap = document.querySelector("#contentCards .dashboard-wrap");
   if (!wrap || document.getElementById("referralCard")) return;
   const card = document.createElement("div");
