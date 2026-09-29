@@ -4843,13 +4843,15 @@ async function showTestAttemptDetail(attemptId) {
 /* ============================================================
    ЛИЧНАЯ ССЫЛКА ДЛЯ КЛИЕНТОВ (WhatsApp / Telegram)
    ============================================================ */
-const REF_TEXT = {"cardTitle": "Клиенттерге арналған менің сілтемем", "cardText": "Бұл сілтемені клиенттерге жіберіңіз: олар есептеуді тегін байқап көреді, ал толық есептеуге немесе платформаға қолжетімділікке тапсырыс беру үшін сізге WhatsApp немесе Telegram арқылы жазады", "copy": "Көшіру", "copied": "Сілтеме көшірілді", "open": "Ашу", "waLabel": "WhatsApp — телефон нөмірі", "waPh": "+7 701 123 45 67", "tgLabel": "Telegram — логин", "tgPh": "@username", "hint": "Бір өрісті толтыру жеткілікті. WhatsApp нөмірін ел кодымен, Telegram логинін бос орынсыз жазыңыз", "save": "Сақтау", "saved": "Сақталды", "saving": "Сақталуда…", "errWa": "WhatsApp нөмірін тексеріңіз: ел коды бар нөмір керек, мысалы +7 701 123 45 67", "errTg": "Telegram логинін тексеріңіз: тек латын әріптері, сандар және _, кемінде 5 таңба", "errSave": "Сақтау мүмкін болмады", "loading": "Жүктелуде…", "ctaTitle": "Толық есептеуге немесе платформаға қолжетімділікке тапсырыс беру", "ctaText": "Жазыңыз — толық талдауды немесе қолжетімділікті қалай алуға болатынын айтамыз", "waBtn": "WhatsApp-қа жазу", "tgBtn": "Telegram-ға жазу", "waMsg": "Сәлеметсіз бе! Толық есептеуге / платформаға қолжетімділікке тапсырыс бергім келеді"};
+const REF_TEXT = {"cardTitle": "Клиенттерге арналған менің сілтемем", "cardText": "Бұл сілтемені клиенттерге жіберіңіз: олар есептеуді тегін байқап көреді, ал толық есептеуге немесе платформаға қолжетімділікке тапсырыс беру үшін сізге WhatsApp немесе Telegram арқылы жазады", "copy": "Көшіру", "copied": "Сілтеме көшірілді", "open": "Ашу", "waLabel": "WhatsApp — телефон нөмірі", "waPh": "+7 701 123 45 67", "tgLabel": "Telegram — логин", "tgPh": "@username", "hint": "Бір өрісті толтыру жеткілікті. WhatsApp нөмірін ел кодымен, Telegram логинін бос орынсыз жазыңыз", "save": "Сақтау", "saved": "Сақталды", "saving": "Сақталуда…", "errWa": "WhatsApp нөмірін тексеріңіз: ел коды бар нөмір керек, мысалы +7 701 123 45 67", "errTg": "Telegram логинін тексеріңіз: тек латын әріптері, сандар және _, кемінде 5 таңба", "errSave": "Сақтау мүмкін болмады", "loading": "Жүктелуде…", "ctaTitle": "Толық есептеуге немесе платформаға қолжетімділікке тапсырыс беру", "ctaText": "Жазыңыз — толық талдауды немесе қолжетімділікті қалай алуға болатынын айтамыз", "waBtn": "WhatsApp-қа жазу", "tgBtn": "Telegram-ға жазу", "waMsg": "Сәлеметсіз бе! Толық есептеуге / платформаға қолжетімділікке тапсырыс бергім келеді", "forUser": "Сілтемені кім үшін баптау", "me": "Өзім үшін", "noLink": "Сілтеме WhatsApp немесе Telegram жазып, «Сақтау» батырмасын басқаннан кейін пайда болады", "needOne": "WhatsApp немесе Telegram жазыңыз", "yourLink": "Клиенттерге арналған сілтеме", "clientTitle": "Тағдыр матрицасын тегін есептеу", "clientSub": "Аты мен туған күнді енгізіңіз — матрица диаграммасы мен визит карточкасын аласыз", "clientCtaTitle": "Толық есептеуді алу", "clientCtaText": "Жазыңыз — матрицаңыздың толық талдауын дайындап беремін", "clientModalTitle": "Бөлім толық есептеуде қолжетімді", "clientModalText": "Матрицаның толық талдауы сұраныс бойынша қолжетімді. Толық есептеуге тапсырыс беру үшін жазыңыз", "close": "Жабу", "cardTextStudent": "Бұл сілтемені клиенттерге жіберіңіз: олар матрицаны тегін есептейді, ал толық есептеуге сізге WhatsApp немесе Telegram арқылы тапсырыс береді", "cardTextTeacher": "Бұл сілтемені платформаға қолжетімділікті сатқыңыз келетін адамдарға жіберіңіз: олар платформаның таныстырылымын көріп, есептеуді байқап, сізге WhatsApp немесе Telegram арқылы жазады"};
 
 function normWhatsapp(v) {
   v = String(v || "").trim();
   if (!v) return "";
   const m = v.match(/wa\.me\/(\+?\d+)/i);
-  return (m ? m[1] : v).replace(/\D/g, "");
+  let d = (m ? m[1] : v).replace(/\D/g, "");
+  if (d.length === 11 && d[0] === "8") d = "7" + d.slice(1); // 8 701 … → 7 701 … (Казахстан, Россия)
+  return d;
 }
 function normTelegram(v) {
   v = String(v || "").trim();
@@ -4875,13 +4877,14 @@ function contactButtonsHtml(c) {
 function landingContactHtml() {
   const c = window._landingContact;
   if (!c || (!c.whatsapp && !c.telegram)) return "";
+  const cm = !!window._clientMode;
   return `<div style="margin:22px 0 6px;padding:20px;border:1px solid #d7aa31;border-radius:14px;text-align:center;background:rgba(0,0,0,.18);">
-      <div style="font-family:PT Serif,Georgia,serif;color:#f6d66c;font-size:20px;margin-bottom:6px;">${REF_TEXT.ctaTitle}</div>
-      <div style="color:#e9dfc6;font-size:14px;margin-bottom:10px;">${REF_TEXT.ctaText}</div>
+      <div style="font-family:PT Serif,Georgia,serif;color:#f6d66c;font-size:20px;margin-bottom:6px;">${cm ? REF_TEXT.clientCtaTitle : REF_TEXT.ctaTitle}</div>
+      <div style="color:#e9dfc6;font-size:14px;margin-bottom:10px;">${cm ? REF_TEXT.clientCtaText : REF_TEXT.ctaText}</div>
       ${contactButtonsHtml(c)}
     </div>`;
 }
-async function loadLandingContact() {
+async function fetchLandingContact() {
   let c = null;
   const ref = new URLSearchParams(window.location.search).get("ref");
   try {
@@ -4889,16 +4892,19 @@ async function loadLandingContact() {
       const { data } = await supabaseClient.rpc("get_referral_contact", { p_code: ref });
       c = (data && data[0]) || null;
     }
+    // Ссылка действует, только если владелец вписал WhatsApp или Telegram.
+    // Иначе открывается обычная главная страница с контактами администратора.
     if (!c || (!c.whatsapp && !c.telegram)) {
       const { data } = await supabaseClient.rpc("get_default_contact");
       c = (data && data[0]) || null;
+      if (c) c.role = null;
     }
   } catch (e) { console.warn("Контакты для пробной версии не загружены:", e); }
   window._landingContact = c && (c.whatsapp || c.telegram) ? c : null;
-  document.querySelectorAll(".lp-contact-slot").forEach(function (el) { el.innerHTML = landingContactHtml(); });
 }
 
-// Карточка «Моя ссылка для клиентов» в разделе «Доступы»
+// Карточка «Моя ссылка для клиентов» в разделе «Доступы».
+// Учитель и ученик настраивают только себя, администратор — любого пользователя (выбор по email).
 async function injectReferralCard() {
   const wrap = document.querySelector("#contentCards .dashboard-wrap");
   if (!wrap || document.getElementById("referralCard")) return;
@@ -4908,11 +4914,10 @@ async function injectReferralCard() {
   card.style.marginBottom = "18px";
   card.innerHTML = `
     <div class="table-title">🔗 ${REF_TEXT.cardTitle}</div>
-    <p style="margin:0 0 12px;">${REF_TEXT.cardText}</p>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
-      <input id="refLinkInput" type="text" readonly class="material-manager-input" style="margin-bottom:0;flex:1;min-width:220px;" value="${REF_TEXT.loading}">
-      <button class="material-manager-button" style="width:auto;" onclick="copyReferralLink()">${REF_TEXT.copy}</button>
-      <button class="material-manager-button" style="width:auto;background:rgba(0,0,0,.15);" onclick="window.open(document.getElementById('refLinkInput').value,'_blank')">${REF_TEXT.open}</button>
+    <p style="margin:0 0 12px;">${window.currentUserRole === "student" ? REF_TEXT.cardTextStudent : REF_TEXT.cardTextTeacher}</p>
+    <div id="refUserPickerBox" style="display:none;margin-bottom:14px;">
+      <label style="display:block;">${REF_TEXT.forUser}
+        <select id="refUserPicker" class="material-manager-input" style="margin:6px 0 0;" onchange="loadReferralFor(this.value)"></select></label>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
       <label style="display:block;">${REF_TEXT.waLabel}
@@ -4922,28 +4927,72 @@ async function injectReferralCard() {
     </div>
     <div style="color:#a9a0b5;font-size:12px;margin:8px 0 12px;">${REF_TEXT.hint}</div>
     <button class="material-manager-button" style="width:auto;" onclick="saveReferralContacts()">${REF_TEXT.save}</button>
-    <div id="refMessage" style="margin-top:10px;min-height:20px;"></div>`;
+    <div id="refMessage" style="margin-top:10px;min-height:20px;"></div>
+    <div id="refLinkBox" style="margin-top:6px;"></div>`;
   const head = wrap.querySelector(".dashboard-head");
   if (head) head.insertAdjacentElement("afterend", card); else wrap.prepend(card);
 
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) return;
+  window._refMyId = session.user.id;
+  window._refTargetId = session.user.id;
+
+  // администратор выбирает пользователя по email
+  if (window.currentUserRole === "admin") {
+    try {
+      const { data: users } = await supabaseClient.from("profiles")
+        .select("id, email, first_name, last_name, role").is("deleted_at", null).order("email");
+      const picker = document.getElementById("refUserPicker");
+      const opts = [`<option value="${session.user.id}">${REF_TEXT.me}</option>`].concat(
+        (users || []).filter(function (u) { return u.id !== session.user.id && u.email; }).map(function (u) {
+          const nm = [u.first_name, u.last_name].filter(Boolean).join(" ");
+          return `<option value="${u.id}">${escapeHtml(u.email)}${nm ? " — " + escapeHtml(nm) : ""}</option>`;
+        }));
+      picker.innerHTML = opts.join("");
+      document.getElementById("refUserPickerBox").style.display = "block";
+    } catch (e) { console.warn("Список пользователей не загружен:", e); }
+  }
+  await loadReferralFor(session.user.id);
+}
+
+function renderReferralLink(row) {
+  const box = document.getElementById("refLinkBox");
+  if (!box) return;
+  if (!row || !row.code || (!row.whatsapp && !row.telegram)) {
+    box.innerHTML = `<div style="color:#a9a0b5;font-size:13px;">${REF_TEXT.noLink}</div>`;
+    return;
+  }
+  const url = referralBaseUrl() + "?ref=" + row.code;
+  box.innerHTML = `
+    <div style="margin:4px 0 6px;color:#f6d66c;">${REF_TEXT.yourLink}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <input id="refLinkInput" type="text" readonly class="material-manager-input" style="margin-bottom:0;flex:1;min-width:220px;" value="${url}">
+      <button class="material-manager-button" style="width:auto;" onclick="copyReferralLink()">${REF_TEXT.copy}</button>
+      <button class="material-manager-button" style="width:auto;background:rgba(0,0,0,.15);" onclick="window.open(document.getElementById('refLinkInput').value,'_blank')">${REF_TEXT.open}</button>
+    </div>`;
+}
+
+async function loadReferralFor(profileId) {
+  window._refTargetId = profileId;
+  const msg = document.getElementById("refMessage");
+  if (msg) msg.textContent = "";
+  document.getElementById("refWhatsapp").value = "";
+  document.getElementById("refTelegram").value = "";
   try {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) return;
-    let { data: row } = await supabaseClient.from("referral_contacts").select("code, whatsapp, telegram").eq("profile_id", session.user.id).maybeSingle();
-    if (!row) {
-      const ins = await supabaseClient.from("referral_contacts").insert({ profile_id: session.user.id }).select("code, whatsapp, telegram").single();
-      row = ins.data;
+    const { data: row } = await supabaseClient.from("referral_contacts")
+      .select("code, whatsapp, telegram").eq("profile_id", profileId).maybeSingle();
+    if (row) {
+      document.getElementById("refWhatsapp").value = row.whatsapp ? "+" + row.whatsapp : "";
+      document.getElementById("refTelegram").value = row.telegram ? (row.telegram.startsWith("+") ? row.telegram : "@" + row.telegram) : "";
     }
-    if (!row) return;
-    document.getElementById("refLinkInput").value = referralBaseUrl() + "?ref=" + row.code;
-    document.getElementById("refWhatsapp").value = row.whatsapp ? "+" + row.whatsapp : "";
-    document.getElementById("refTelegram").value = row.telegram ? (row.telegram.startsWith("+") ? row.telegram : "@" + row.telegram) : "";
-  } catch (e) { console.warn("Ссылка для клиентов не загружена:", e); }
+    renderReferralLink(row);
+  } catch (e) { console.warn("Ссылка для клиентов не загружена:", e); renderReferralLink(null); }
 }
 
 async function copyReferralLink() {
   const input = document.getElementById("refLinkInput");
   const msg = document.getElementById("refMessage");
+  if (!input) return;
   try { await navigator.clipboard.writeText(input.value); }
   catch (e) { input.select(); document.execCommand("copy"); }
   if (msg) { msg.style.color = "#8fd98f"; msg.textContent = REF_TEXT.copied; }
@@ -4953,17 +5002,19 @@ async function saveReferralContacts() {
   const msg = document.getElementById("refMessage");
   const wa = normWhatsapp(document.getElementById("refWhatsapp").value);
   const tg = normTelegram(document.getElementById("refTelegram").value);
+  if (!wa && !tg) { msg.style.color = "#ff9b9b"; msg.textContent = REF_TEXT.needOne; return; }
   if (!validWhatsapp(wa)) { msg.style.color = "#ff9b9b"; msg.textContent = REF_TEXT.errWa; return; }
   if (!validTelegram(tg)) { msg.style.color = "#ff9b9b"; msg.textContent = REF_TEXT.errTg; return; }
   msg.style.color = "#c9bfa8"; msg.textContent = REF_TEXT.saving;
+  const targetId = window._refTargetId || window._refMyId;
   try {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const { error } = await supabaseClient.from("referral_contacts")
-      .update({ whatsapp: wa || null, telegram: tg || null, updated_at: new Date().toISOString() })
-      .eq("profile_id", session.user.id);
+    const { data: row, error } = await supabaseClient.from("referral_contacts")
+      .upsert({ profile_id: targetId, whatsapp: wa || null, telegram: tg || null, updated_at: new Date().toISOString() }, { onConflict: "profile_id" })
+      .select("code, whatsapp, telegram").single();
     if (error) throw error;
     document.getElementById("refWhatsapp").value = wa ? "+" + wa : "";
     document.getElementById("refTelegram").value = tg ? (tg.startsWith("+") ? tg : "@" + tg) : "";
+    renderReferralLink(row);
     msg.style.color = "#8fd98f"; msg.textContent = REF_TEXT.saved;
   } catch (e) {
     console.error(e);
@@ -4971,10 +5022,16 @@ async function saveReferralContacts() {
   }
 }
 
-function showLanding() {
+async function showLanding() {
+  if (window._landingContact === undefined) await fetchLandingContact();
+  renderLandingPage();
+}
+
+function renderLandingPage() {
   document.body.style.visibility = "visible";
   window.scrollTo(0, 0);
-  setTimeout(loadLandingContact, 0);
+  const clientMode = !!(window._landingContact && window._landingContact.role === "student");
+  window._clientMode = clientMode;
   const directions = [
     { icon: "✦", title: "Тағдыр матрицасы", text: "Туған күн бойынша толық талдау: таланттар, тағдыр мақсаты, кармалық міндеттер, қарым-қатынас, қаржы, денсаулық картасы" },
     { icon: "👶", title: "Бала матрицасы", text: "Ата-аналарға арналған талдау: баланың мінезі, қабілеттері және оның ашылуына қалай көмектесуге болады" },
@@ -5039,22 +5096,22 @@ function showLanding() {
     <div class="lp-wrap">
       <div class="lp-top">
         <div class="lp-logo">✧ NUMEROLOGY<small>Platform</small></div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        ${clientMode ? "" : `<div style="display:flex;gap:10px;flex-wrap:wrap;">
           <button type="button" class="lp-btn ghost" onclick="showLogin()">Кіру</button>
           <button type="button" class="lp-btn" onclick="showRegister()">Тіркелу</button>
-        </div>
+        </div>`}
       </div>
 
-      <div class="lp-hero">
+      ${clientMode ? `<div class="lp-hero"><h1>${REF_TEXT.clientTitle}</h1><p>${REF_TEXT.clientSub}</p></div>` : `<div class="lp-hero">
         <h1>Нумерологтарға және<br>нумерологияны үйренушілерге<br>арналған платформа</h1>
         <p>Туған күн бойынша дайын есептеулер, әдістемелік құралдар мен кітапхана бір жерде. Нумерологияны өз бетіңізше үйреніңіз немесе клиенттермен жұмысыңызды жеделдетіңіз</p>
         <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
           <button type="button" class="lp-btn" onclick="document.getElementById('lpTrial').scrollIntoView({behavior:'smooth'})">Тегін байқап көру</button>
           <button type="button" class="lp-btn ghost" onclick="showRegister()">Тіркелу</button>
         </div>
-      </div>
+      </div>`}
 
-      <div class="lp-h2">Бағыттар</div>
+      ${clientMode ? "" : `<div class="lp-h2">Бағыттар</div>
       <div class="lp-grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));">
         ${directions.map(d => `<div class="lp-card"><div class="ic">${d.icon}</div><h3>${d.title}</h3><p>${d.text}</p></div>`).join("")}
       </div>
@@ -5069,11 +5126,11 @@ function showLanding() {
       <div class="lp-who">
         <div class="lp-card"><div class="ic">🌱</div><h3>Нумерологияны үйренушілерге</h3><p>Өз матрицаңызды және жақындарыңыздың матрицасын есептеңіз, дайын талдауларды оқыңыз және әдістемелік құралдар арқылы әдісті өз қарқыныңызбен меңгеріңіз</p></div>
         <div class="lp-card"><div class="ic">💼</div><h3>Тәжірибелі нумерологтарға</h3><p>Сағаттар бойы қолмен есептеудің орнына бір минутта нәтиже: диаграммасы бар дайын талдауды өз сөзіңізбен толықтырып, клиентке жүктеп бере аласыз</p></div>
-      </div>
+      </div>`}
 
-      <div class="lp-h2" id="lpTrial">Тегін байқап көріңіз</div>
+      <div id="lpTrial" ${clientMode ? 'style="display:none"' : 'class="lp-h2"'}>Тегін байқап көріңіз</div>
       <div class="lp-trial">
-        <p style="margin:0 0 20px;color:#e9dfc6;text-align:center;">Аты мен туған күнді енгізіңіз — тағдыр матрицасының диаграммасы мен визит карточкасын аласыз</p>
+        ${clientMode ? "" : `<p style="margin:0 0 20px;color:#e9dfc6;text-align:center;">Аты мен туған күнді енгізіңіз — тағдыр матрицасының диаграммасы мен визит карточкасын аласыз</p>`}
         <label>Аты</label>
         <input id="lpName" type="text">
         <label>Туған күні</label>
@@ -5084,16 +5141,30 @@ function showLanding() {
       </div>
 
       <div class="lp-foot">
-        <div class="lp-contact-slot" style="max-width:760px;margin:0 auto 20px;"></div>
-        <div class="lp-h2" style="margin-top:0;">Бастауға дайынсыз ба?</div>
+        <div class="lp-contact-slot" style="max-width:760px;margin:0 auto 20px;">${landingContactHtml()}</div>
+        ${clientMode ? "" : `<div class="lp-h2" style="margin-top:0;">Бастауға дайынсыз ба?</div>
         <button type="button" class="lp-btn" onclick="showRegister()">Тіркелу</button>
-        <div style="margin-top:14px;"><button type="button" onclick="showLogin()" style="background:none;border:none;color:#d7aa31;cursor:pointer;font-size:15px;">Аккаунтыңыз бар ма? Кіру</button></div>
+        <div style="margin-top:14px;"><button type="button" onclick="showLogin()" style="background:none;border:none;color:#d7aa31;cursor:pointer;font-size:15px;">Аккаунтыңыз бар ма? Кіру</button></div>`}
       </div>
     </div>
   </div>`;
 }
 
 function showTrialPaywall() {
+  if (window._clientMode) {
+    const mc = document.createElement("div");
+    mc.className = "lp-modal";
+    mc.innerHTML = `<div>
+      <div style="font-size:40px;margin-bottom:8px;">🔒</div>
+      <h3 style="font-family:PT Serif,Georgia,serif;font-weight:500;color:#f6d66c;margin:0 0 12px;font-size:22px;">${REF_TEXT.clientModalTitle}</h3>
+      <p style="color:#e9dfc6;line-height:1.6;margin:0 0 18px;">${REF_TEXT.clientModalText}</p>
+      <div style="margin:0 0 14px;">${contactButtonsHtml(window._landingContact)}</div>
+      <button type="button" onclick="this.closest('.lp-modal').remove()" style="background:none;border:none;color:#a99fb5;cursor:pointer;font-size:14px;">${REF_TEXT.close}</button>
+    </div>`;
+    mc.addEventListener("click", function (e) { if (e.target === mc) mc.remove(); });
+    document.body.appendChild(mc);
+    return;
+  }
   const m = document.createElement("div");
   m.className = "lp-modal";
   m.innerHTML = `
@@ -5157,13 +5228,14 @@ function runTrialMatrix() {
       </div>
       ${card ? `<div class="lp-open"><h3>${escapeHtml(card.title)}</h3>${cardHtml}</div>` : ""}
       ${locked.map(t => `<button type="button" class="lp-lock" onclick="showTrialPaywall()"><span>${escapeHtml(t)}</span><span>🔒</span></button>`).join("")}
-      <div class="lp-contact-slot">${landingContactHtml()}</div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px;">
         <button type="button" class="lp-btn" onclick="downloadHtmlFile(window._trialDownload.title + '.html', window._trialDownload.body)">Жүктеу (диаграмма + визит карточкасы)</button>
-        <button type="button" class="lp-btn ghost" onclick="showRegister()">Толық нұсқаны ашу</button>
       </div>
+      <div class="lp-contact-slot">${landingContactHtml()}</div>
     </div>`;
   centerMatrixRingScroll(out);
+  // контакты уже показаны под расчётом — нижний блок с теми же кнопками скрываем, чтобы не повторялись
+  document.querySelectorAll(".lp-foot .lp-contact-slot").forEach(function (el) { el.style.display = "none"; });
   out.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
