@@ -4892,13 +4892,8 @@ async function fetchLandingContact() {
       const { data } = await supabaseClient.rpc("get_referral_contact", { p_code: ref });
       c = (data && data[0]) || null;
     }
-    // Ссылка действует, только если владелец вписал WhatsApp или Telegram.
-    // Иначе открывается обычная главная страница с контактами администратора.
-    if (!c || (!c.whatsapp && !c.telegram)) {
-      const { data } = await supabaseClient.rpc("get_default_contact");
-      c = (data && data[0]) || null;
-      if (c) c.role = null;
-    }
+    // Контакты показываются ТОЛЬКО по личной ссылке, владелец которой вписал WhatsApp или Telegram.
+    // На обычной главной странице (без личной ссылки) контактов нет.
   } catch (e) { console.warn("Контакты для пробной версии не загружены:", e); }
   window._landingContact = c && (c.whatsapp || c.telegram) ? c : null;
 }
