@@ -5315,6 +5315,15 @@ async function submitNewPassword() {
   setTimeout(() => location.reload(), 1000);
 }
 
+// Хабарламалардағы бөлім атаулары: әкімші кіргенде платформа бөлімдердің өзекті тізімін базаға өзі жазады
+async function syncDirectionLabels() {
+  try {
+    const rows = DIRECTIONS.map(function (d) { return { key: d.key, title: d.title.replace(/<br>/g, " "), updated_at: new Date().toISOString() }; });
+    const { error } = await supabaseClient.from("direction_labels").upsert(rows, { onConflict: "key" });
+    if (error) console.warn("Бөлім атауларын жаңарту мүмкін болмады:", error.message);
+  } catch (e) { console.warn("Бөлім атауларын жаңарту мүмкін болмады:", e); }
+}
+
 async function checkAuth() {
   try {
     if (window.location.hash.includes("type=recovery")) {
@@ -5362,6 +5371,7 @@ async function checkAuth() {
     if (isManager) hasAccess = true;
 
     window.currentUserRole = isAdminEmail(userEmail) ? "admin" : role;
+    if (window.currentUserRole === "admin") syncDirectionLabels();
     window.currentUserId = user.id;
     window.currentUserIsManager = isManager;
     window.currentUserHasAccess = hasAccess;
