@@ -754,6 +754,10 @@ async function showSection(section) {
   if (section === "statistics") {
     if (!isAdmin && !hasGrant("statistics")) { renderLockedSection(section); return; }
     await renderStatistics();
+    if (window.currentUserRole === "admin") {
+      const anchor = document.querySelector("#contentCards #clientStats");
+      if (anchor) await renderAdminTrialLeads(anchor);
+    }
     return;
   }
 }
@@ -4953,6 +4957,46 @@ async function injectReferralCard() {
   await loadReferralFor(session.user.id);
 }
 
+// Только для администратора: кто делал пробный расчёт по его личной ссылке
+async function renderAdminTrialLeads(afterEl) {
+  const box = document.createElement("div");
+  box.className = "table-card";
+  box.id = "trialLeadsCard";
+  box.style.marginBottom = "18px";
+  box.innerHTML = `<div class="table-title">📋 Байқау есептеулері (басты бет және менің сілтемем)</div><div id="trialLeadsBody" style="color:#a9a0b5;">…</div>`;
+  afterEl.insertAdjacentElement("afterend", box);
+  try {
+    const { data, error, count } = await supabaseClient.from("trial_leads")
+      .select("name, birth_date, created_at, ref_code", { count: "exact" })
+      .order("created_at", { ascending: false }).limit(200);
+    if (error) throw error;
+    const body = document.getElementById("trialLeadsBody");
+    if (!data || !data.length) { body.textContent = "Әзірге ешкім байқау есептеуін жасамады"; return; }
+    const fmt = function (iso) {
+      const d = new Date(iso);
+      return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + d.getFullYear()
+        + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    };
+    body.innerHTML = `<div style="margin-bottom:8px;color:#e9dfc6;">Барлығы: <b>${count ?? data.length}</b></div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <thead><tr>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid rgba(225,180,52,.35);color:#f6d66c;font-weight:400;">Күні мен уақыты</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid rgba(225,180,52,.35);color:#f6d66c;font-weight:400;">Аты</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid rgba(225,180,52,.35);color:#f6d66c;font-weight:400;">Туған күні</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid rgba(225,180,52,.35);color:#f6d66c;font-weight:400;">Қайдан</th>
+        </tr></thead>
+        <tbody>${data.map(function (r) {
+          return `<tr><td style="padding:8px;border-bottom:1px solid rgba(225,180,52,.12);white-space:nowrap;">${fmt(r.created_at)}</td>
+            <td style="padding:8px;border-bottom:1px solid rgba(225,180,52,.12);">${escapeHtml(r.name || "—")}</td>
+            <td style="padding:8px;border-bottom:1px solid rgba(225,180,52,.12);white-space:nowrap;">${escapeHtml(r.birth_date || "—")}</td>
+            <td style="padding:8px;border-bottom:1px solid rgba(225,180,52,.12);white-space:nowrap;color:#c9bfa8;">${r.ref_code === "site" ? "Басты бет" : "Сіздің сілтемеңіз"}</td></tr>`;
+        }).join("")}</tbody></table></div>`;
+  } catch (e) {
+    console.warn("Пробные расчёты не загружены:", e);
+    box.remove();
+  }
+}
+
 function renderReferralLink(row) {
   const box = document.getElementById("refLinkBox");
   if (!box) return;
@@ -5199,6 +5243,10 @@ function runTrialMatrix() {
     err.textContent = "Есептеу орындалмады.";
     return;
   }
+  try {
+    const refCode = new URLSearchParams(window.location.search).get("ref") || "";
+    supabaseClient.rpc("log_trial", { p_code: refCode, p_name: name, p_birth: birthDate }).then(function () {}, function () {});
+  } catch (e) { /* не мешаем расчёту */ }
   const blocks = res.rasshifrovka || [];
   const card = blocks.find(b => /визитн/i.test(b.title)) || blocks[0];
   const locked = blocks.filter(b => b !== card).map(b => b.title)
