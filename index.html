@@ -516,6 +516,7 @@ body, body * { font-variant-numeric: lining-nums; }
 <script src="karmic-data-kz.js"></script>
 <script src="karmic-engine-kz.js"></script>
 <script src="biorhythm-engine-kz.js"></script>
+<script src="codes-engine-kz.js"></script>
 <script>
 
 /* ============================================================
@@ -578,7 +579,8 @@ const DIRECTIONS = [
   { key: "moonsun",       icon: "🌙",  title: "Ай және Күн<br>әдісі бойынша<br>болжау" },
   { key: "prognostika",   icon: "🔮",  title: "Прогностика" },
   { key: "karmic",        icon: "☯",   title: "Кармалық<br>нумерология" },
-  { key: "biorhythms",    icon: "📈",  title: "Биоырғақтар" }
+  { key: "biorhythms",    icon: "📈",  title: "Биоырғақтар" },
+  { key: "codes",         icon: "💎",  title: "Махаббат,<br>миллионер,<br>қарызды өтеу<br>кодтары" }
 ];
 
 // Бөлімнің мәтіндері әлі қосылмаса (қозғалтқыш файлы жоқ) — «жақында» беті көрсетіледі
@@ -587,6 +589,7 @@ function isCalculatorReady(type) {
   if (type === "karmic") return !!(window.KarmicEngine && window.KARMIC_TEXTS);
   if (type === "moonsun") return !!window.MoonSunTable;
   if (type === "biorhythms") return !!window.BiorhythmEngine;
+  if (type === "codes") return !!window.CodesEngine;
   return true;
 }
 const DIRECTION_NAMES = Object.fromEntries(DIRECTIONS.map(d => [d.key, d.title.replace(/<br>/g, " ")]));
@@ -819,13 +822,13 @@ async function openCalculator(type) {
     return;
   }
 
-  if (type === "pythagoras") {
+  if (type === "pythagoras" || type === "codes") {
     document.body.innerHTML = `
       <div style="min-height:100vh;padding:40px;background:linear-gradient(135deg,#142b28,#1d3f3c,#142b28);color:#f8e7a8;font-family:Arial,sans-serif;">
         <div style="max-width:650px;margin:0 auto;padding:35px;border:1px solid #d7aa31;border-radius:20px;background:linear-gradient(145deg,#24504c,#1c3a37);">
           <h1 style="margin-top:0;color:#f6d66c;font-family:PT Serif,Georgia,serif;font-weight:500;">${title}</h1>
 
-          <label>Тегі</label>
+          <label>Тегі</label>${type === "codes" ? `<div style="font-size:13px;color:#cfe3df;margin-top:4px;">Әйелдер үшін қыз кезіндегі тегі көрсетіледі</div>` : ""}
           <input id="pythLastName" type="text" style="display:block;width:100%;padding:13px;margin:8px 0 16px;box-sizing:border-box;border:1px solid rgba(225,180,52,.5);border-radius:10px;background:rgba(0,0,0,.2);color:#fff;font-size:16px;">
 
           <label>Аты</label>
@@ -849,7 +852,7 @@ async function openCalculator(type) {
             style="display:block;width:100%;padding:13px;margin:8px 0 5px;box-sizing:border-box;border:1px solid rgba(225,180,52,.5);border-radius:10px;background:rgba(0,0,0,.2);color:#fff;font-size:16px;">
           <div id="dateError" style="color:#ff9b9b;min-height:22px;margin-bottom:15px;"></div>
 
-          <button onclick="calculatePythagoras()" style="width:100%;padding:14px;border:1px solid #d7aa31;border-radius:10px;background:linear-gradient(90deg,#3c8783,#2f6d6a);color:#f8d96d;font-size:16px;cursor:pointer;">Есептеу</button>
+          <button onclick="${type === "codes" ? "calculateCodes()" : "calculatePythagoras()"}" style="width:100%;padding:14px;border:1px solid #d7aa31;border-radius:10px;background:linear-gradient(90deg,#3c8783,#2f6d6a);color:#f8d96d;font-size:16px;cursor:pointer;">Есептеу</button>
           <button onclick="location.reload()" style="width:100%;padding:14px;margin-top:10px;border:1px solid rgba(225,180,52,.5);border-radius:10px;background:rgba(0,0,0,.15);color:#f5d46b;font-size:16px;cursor:pointer;">Артқа</button>
 
           <div id="result" style="margin-top:30px"></div>
@@ -2332,6 +2335,118 @@ function toggleAccordionBody(id) {
   if (el) el.classList.toggle("hidden");
 }
 
+function calculateCodes() {
+  const lastName = document.getElementById("pythLastName")?.value.trim();
+  const firstName = document.getElementById("pythFirstName")?.value.trim();
+  const patronymic = document.getElementById("pythPatronymic")?.value.trim();
+  const alphabet = document.getElementById("pythAlphabet")?.value || "russian";
+  const birthDate = document.getElementById("birthDate")?.value.trim();
+  const dateError = document.getElementById("dateError");
+  const result = document.getElementById("result");
+  if (dateError) dateError.textContent = "";
+  if (result) result.innerHTML = "";
+
+  if (!lastName || !firstName) {
+    if (dateError) dateError.textContent = "Тегіңіз бен атыңызды енгізіңіз.";
+    return;
+  }
+  if (!isValidBirthDate(birthDate)) {
+    if (dateError) dateError.textContent = "Туған күнді КК.АА.ЖЖЖЖ форматында дұрыс енгізіңіз.";
+    return;
+  }
+  if (!result || !window.CodesEngine) return;
+
+  const [d, m, y] = birthDate.split(".").map(Number);
+
+  let res;
+  try {
+    res = window.CodesEngine.getFullResult(lastName, firstName, patronymic, d, m, y, alphabet);
+  } catch (error) {
+    console.error("Кодтарды есептеу қатесі:", error);
+    result.innerHTML = `<div style="color:#ff9d9d;padding:16px;">Есептеу орындалмады: ${escapeHtml(error.message || String(error))}</div>`;
+    return;
+  }
+
+  const name = lastName + " " + firstName;
+  const codesPerson = "Махаббат, миллионер, қарызды өтеу кодтары - " + [lastName, firstName, patronymic].filter(Boolean).join(" ");
+  result.innerHTML = `
+    <div style="max-width:720px;margin:0 auto;" id="codesResult">
+
+      <div class="accordion-item codes-section">
+        <button type="button" class="accordion-header" onclick="toggleAccordionBody('code-love')"><span>💗 Махаббат коды</span><span>▾</span></button>
+        <div class="accordion-body hidden" id="code-love" style="white-space:normal;">
+          <div class="codes-pic" style="text-align:center;">${res.loveSvg}</div>
+          <div class="editable-text codes-text" contenteditable="false" style="margin-top:14px;padding:6px;border-radius:6px;outline:none;">
+            <p><b>Қалай қолдану керек:</b> сандары бар жүректі <b>толған айда</b> — <b>қызыл қаламмен қызыл қағазға</b> қайта салыңыз. Суретті өзіңізбен бірге, мысалы сөмкеде алып жүріңіз, бірақ <b>әмиянда емес</b>.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item codes-section">
+        <button type="button" class="accordion-header" onclick="toggleAccordionBody('code-millionaire')"><span>⭐ Миллионер коды</span><span>▾</span></button>
+        <div class="accordion-body hidden" id="code-millionaire" style="white-space:normal;">
+          <div class="codes-pic" style="text-align:center;">${res.starSvg}</div>
+          <div class="editable-text codes-text" contenteditable="false" style="margin-top:14px;padding:6px;border-radius:6px;outline:none;">
+            <p style="color:#f6d66c;font-family:PT Serif,Georgia,serif;font-size:18px;margin:6px 0 8px;">Бір долларлық купюраға миллионер кодын қалай салу керек</p>
+            <ol style="margin:0 0 14px;padding-left:22px;line-height:1.6;">
+              <li><b>Өсіп келе жатқан айда</b> салыңыз.</li>
+              <li><b>Бір долларлық</b> купюраны алдыңғы жағымен (портреті бар жағы) өзіңізге қаратып алыңыз.</li>
+              <li>Портреттің сол жағына <b>қызыл қаламмен</b> төменде көрсетілгендей сандары бар жұлдыз салыңыз.</li>
+              <li>Купюраны бүктеп, әмияныңызға салыңыз.</li>
+            </ol>
+          </div>
+          <div class="codes-pic">${res.dollarSvg}</div>
+        </div>
+      </div>
+
+      <div class="accordion-item codes-section">
+        <button type="button" class="accordion-header" onclick="toggleAccordionBody('code-debt')"><span>⭕ Қарызды өтеу коды</span><span>▾</span></button>
+        <div class="accordion-body hidden" id="code-debt" style="white-space:normal;">
+          <div class="codes-pic" style="text-align:center;">${res.debtSvg}</div>
+          <div class="editable-text codes-text" contenteditable="false" style="margin-top:14px;padding:6px;border-radius:6px;outline:none;">
+            <p style="color:#f6d66c;font-family:PT Serif,Georgia,serif;font-size:18px;margin:6px 0 8px;">Қарызды өтеу шеңберін қалай жасау керек</p>
+            <ol style="margin:0 0 14px;padding-left:22px;line-height:1.6;">
+              <li>Техниканы дәл <b>жаңа айда</b> орындаңыз.</li>
+              <li>Шеңбер сызып, оны жоғарыдағы суреттегідей 8 секторға бөліңіз.</li>
+              <li>Секторларды суреттегідей түстермен бояп, сандарды жазыңыз.</li>
+              <li>Шеңбердің ортасына оны жасаған күніңізді жазыңыз.</li>
+              <li>Өтеу шеңберін әмиянға салыңыз. Оны үнемі шығара бермеу және бөтен көзден алыс ұстау өте маңызды.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;">
+        <button type="button" id="editToggleBtn" class="material-manager-button" style="width:auto;" onclick="toggleResultEditing(this)">✏️ Өзгерту</button>
+        <button type="button" id="calcDownloadBtn" class="material-manager-button" style="width:auto;" onclick='downloadCodesResult(${JSON.stringify(codesPerson)}, ${JSON.stringify(birthDate)})'>Жүктеп алу (суреттер + мәтін)</button>
+        <button type="button" class="material-manager-button" style="width:auto;background:rgba(0,0,0,.15);" onclick="openCalculator('codes')">Жаңа есептеу</button>
+      </div>
+    </div>`;
+
+  saveCalculationHistory({ direction: "codes", title: "Махаббат, миллионер, қарызды өтеу кодтары - " + name + " - " + birthDate, personName: name, birthDate, lastName, firstName, patronymic, alphabet });
+}
+
+function downloadCodesResult(personLabel, dateLabel) {
+  let body = `<h1>${escapeHtml(personLabel)}${dateLabel ? " (" + escapeHtml(dateLabel) + ")" : ""}</h1>`;
+  document.querySelectorAll("#codesResult .codes-section").forEach(function (section) {
+    const title = section.querySelector(".accordion-header span")?.textContent || "";
+    body += `<div style="break-inside:avoid;page-break-inside:avoid;margin-bottom:24px;"><h2>${escapeHtml(title)}</h2>`;
+    section.querySelectorAll(".accordion-body > .codes-pic, .accordion-body > .codes-text").forEach(function (el) {
+      if (el.classList.contains("codes-pic")) {
+        body += `<div style="text-align:center;margin:10px 0;">${el.innerHTML}</div>`;
+      } else {
+        const clone = el.cloneNode(true);
+        clone.removeAttribute("contenteditable");
+        clone.style.background = "none"; clone.style.border = "none";
+        clone.querySelectorAll("[style]").forEach(function (n) { n.style.color = ""; });
+        body += `<div style="font-size:14px;line-height:1.5;">${clone.innerHTML}</div>`;
+      }
+    });
+    body += `</div>`;
+  });
+  downloadHtmlFile(personLabel + (dateLabel ? " - " + dateLabel : "") + ".html", body);
+}
+
 function calculatePythagoras() {
   const lastName = document.getElementById("pythLastName")?.value.trim();
   const firstName = document.getElementById("pythFirstName")?.value.trim();
@@ -3711,7 +3826,7 @@ async function saveLibraryLink(id) {
    МОИ РАСЧЁТЫ
    ============================================================ */
 
-const DIRECTION_ORDER = ["adult", "child", "compatibility", "moonsun", "prognostika", "karmic", "biorhythms"];
+const DIRECTION_ORDER = ["adult", "child", "compatibility", "moonsun", "prognostika", "karmic", "biorhythms", "codes"];
 
 function paginatedTableHtml(containerId, headerHtml, rowsHtmlArray, pageSize) {
   pageSize = pageSize || 15;
@@ -3845,14 +3960,14 @@ async function reopenCalculation(r) {
     await openCalculator(r.direction);
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
-    if (r.direction === "pythagoras") {
+    if (r.direction === "pythagoras" || r.direction === "codes") {
       const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
       set("pythLastName", r.last_name);
       set("pythFirstName", r.first_name);
       set("pythPatronymic", r.patronymic);
       set("pythAlphabet", r.alphabet || "russian");
       set("birthDate", r.birth_date);
-      calculatePythagoras();
+      if (r.direction === "codes") calculateCodes(); else calculatePythagoras();
     } else if (r.direction === "compatibility") {
       const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
       set("birthDate1", r.birth_date);
