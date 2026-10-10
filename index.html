@@ -515,6 +515,7 @@ body, body * { font-variant-numeric: lining-nums; }
 <script src="prognostika-engine-kz.js"></script>
 <script src="karmic-data-kz.js"></script>
 <script src="karmic-engine-kz.js"></script>
+<script src="biorhythm-engine-kz.js"></script>
 <script>
 
 /* ============================================================
@@ -560,7 +561,7 @@ function showNoAccessMessage() {
   if (meta.isExpired && meta.endsAt) {
     const startedLabel = meta.startsAt ? new Date(meta.startsAt).toLocaleDateString("ru-RU") : null;
     const endedLabel = new Date(meta.endsAt).toLocaleDateString("ru-RU");
-    customAlert(`Истёк срок доступа.${startedLabel ? " Қолжетімділік ашылған күн — " + startedLabel + "," : ""} истёк ${endedLabel}. Чтобы продлить, обратитесь к әкімшіу или своему учителю.`);
+    customAlert(`Қолжетімділік мерзімі өтті.${startedLabel ? " Қолжетімділік ашылған күн — " + startedLabel + "," : ""} аяқталған күн — ${endedLabel}. Ұзарту үшін әкімшіге немесе өз ұстазыңызға хабарласыңыз.`);
     return;
   }
   customAlert("Сізде бұл бөлімге қолжетімділік жоқ. Әкімшіге немесе ұстазға хабарласыңыз.");
@@ -576,7 +577,8 @@ const DIRECTIONS = [
   { key: "compatibility", icon: "💕",  title: "Үйлесімділік<br>матрицасы" },
   { key: "moonsun",       icon: "🌙",  title: "Ай және Күн<br>әдісі бойынша<br>болжау" },
   { key: "prognostika",   icon: "🔮",  title: "Прогностика" },
-  { key: "karmic",        icon: "☯",   title: "Кармалық<br>нумерология" }
+  { key: "karmic",        icon: "☯",   title: "Кармалық<br>нумерология" },
+  { key: "biorhythms",    icon: "📈",  title: "Биоырғақтар" }
 ];
 
 // Бөлімнің мәтіндері әлі қосылмаса (қозғалтқыш файлы жоқ) — «жақында» беті көрсетіледі
@@ -584,13 +586,14 @@ function isCalculatorReady(type) {
   if (type === "prognostika") return !!window.PrognostikaEngine;
   if (type === "karmic") return !!(window.KarmicEngine && window.KARMIC_TEXTS);
   if (type === "moonsun") return !!window.MoonSunTable;
+  if (type === "biorhythms") return !!window.BiorhythmEngine;
   return true;
 }
 const DIRECTION_NAMES = Object.fromEntries(DIRECTIONS.map(d => [d.key, d.title.replace(/<br>/g, " ")]));
 const SECTION_LABELS = { manuals: "Әдістемелік құрал", videos: "Бейне", tests: "Тест" };
 const CONTENT_TYPES = [
   { key: "calculators", label: "Калькуляторлар" },
-  { key: "manuals", label: "Методички" },
+  { key: "manuals", label: "Әдістемелер" },
   { key: "videos", label: "Бейне" },
   { key: "tests", label: "Тесттер" }
 ];
@@ -613,6 +616,23 @@ function hasGrant(section, direction) {
   if (section === "statistics") return itemGrantActive(scope.statistics);
   if (!direction) return false;
   return itemGrantActive(scope[direction] && scope[direction][section]);
+}
+
+// Бөлім белгішесі (ярлык) қолжетімділікте «Белгіше көрінеді» құсбелгісі қойылғанда ғана көрінеді.
+// Әкімші барлық белгішелерді әрдайым көреді.
+// section (calculators / manuals / videos / tests) — әр материал түріне белгіше бөлек.
+// section жоқ болса — белгіше кем дегенде біреуінде көрінеді.
+function isDirectionVisible(direction, section) {
+  if (window.currentUserRole === "admin") return true;
+  const scope = window.currentUserGrant || {};
+  const dir = scope[direction];
+  if (!dir) return false;
+  const vt = dir.visible_types;
+  if (vt && typeof vt === "object") {
+    if (section) return vt[section] === true;
+    return Object.values(vt).some(v => v === true);
+  }
+  return dir.visible === true;
 }
 
 function hideWelcome() {
@@ -643,7 +663,11 @@ function setActiveSection(section) {
    action: 'calculator' | 'material'  (material охватывает manuals/videos/tests) */
 function renderDirectionCards(section, action, materialFlags) {
   materialFlags = materialFlags || {};
-  return DIRECTIONS.map(function (card) {
+  const visibleDirections = DIRECTIONS.filter(function (card) { return isDirectionVisible(card.key, section); });
+  if (!visibleDirections.length) {
+    return `<div class="empty-table" style="grid-column:1/-1;">Әзірге ашық бөлімдер жоқ.<br><br>Әкімшіге немесе ұстазға хабарласыңыз.</div>`;
+  }
+  return visibleDirections.map(function (card) {
     const icon = card.icon === "pythagoras" ? pythagorasIconHtml() : `<div class="card-icon">${card.icon}</div>`;
     let click = "";
     let subtitle = "";
@@ -687,7 +711,7 @@ function renderLockedSection(section) {
     <div class="dashboard-wrap">
       <div class="dashboard-head">
         <div>
-          <h2>${titles[section] || "Раздел платформы"}</h2>
+          <h2>${titles[section] || "Платформа бөлімі"}</h2>
           <p>Бөлім қолжетімділік берілгеннен кейін ашылады.</p>
         </div>
         <div class="dashboard-badge">Қолжетімділік жабық</div>
@@ -696,11 +720,11 @@ function renderLockedSection(section) {
         <div class="access-locked-icon">🔒</div>
         <h2>Сізде бұл бөлімге қолжетімділік жоқ</h2>
         <p>
-          Вы успешно зарегистрированы в Numerology Platform.<br>
-          Чтобы открыть раздел, әкімші или учитель должен выдать вам доступ.
+          Сіз Numerology Platform-да сәтті тіркелдіңіз.<br>
+          Бөлімді ашу үшін әкімші немесе ұстаз сізге қолжетімділік беруі керек.
         </p>
         <button class="material-manager-button" style="width:auto;margin-top:24px;" onclick="showSection('access')">
-          Посмотреть статус доступа
+          Қолжетімділік мәртебесін көру
         </button>
       </div>
     </div>`;
@@ -817,7 +841,7 @@ async function openCalculator(type) {
             <option value="english" style="background:#244742;color:#fff;">Ағылшын</option>
           </select>
           <div style="color:#c9bfa8;font-size:13px;margin-bottom:20px;line-height:1.4;">
-            Если в вашем Аты-жөні есть казахские буквы (Ә, Ғ, Қ, Ң, Ө, Ұ, Ү, Һ, І) — выберите «Қазақша». Если Аты-жөні написано латиницей — выберите «Ағылшын». Во всех остальных случаях подходит «Орысша».
+            Егер аты-жөніңізде қазақ әріптері (Ә, Ғ, Қ, Ң, Ө, Ұ, Ү, Һ, І) болса — «Қазақша» таңдаңыз. Егер аты-жөніңіз латынша жазылса — «Ағылшын» таңдаңыз. Қалған жағдайларда «Орысша» сәйкес келеді.
           </div>
 
           <label>Туған күні</label>
@@ -897,6 +921,8 @@ async function openCalculator(type) {
           style="display:block;width:100%;padding:13px;margin:8px 0 5px;box-sizing:border-box;border:1px solid rgba(225,180,52,.5);border-radius:10px;background:rgba(0,0,0,.2);color:#fff;font-size:16px;">
         <div id="prognostikaYearError" style="color:#ff9b9b;min-height:22px;margin-bottom:10px;"></div>` : ""}
 
+        ${type === "biorhythms" ? calcDateFieldHtml("bioStartDate", "Есептеу басталатын күн (график 31 күнге алға құрылады)") : ""}
+
         <button onclick="calculate('${type}')" style="width:100%;padding:14px;border:1px solid #d7aa31;border-radius:10px;background:linear-gradient(90deg,#3c8783,#2f6d6a);color:#f8d96d;font-size:16px;cursor:pointer;">Есептеу</button>
         <button onclick="location.reload()" style="width:100%;padding:14px;margin-top:10px;border:1px solid rgba(225,180,52,.5);border-radius:10px;background:rgba(0,0,0,.15);color:#f5d46b;font-size:16px;cursor:pointer;">Артқа</button>
 
@@ -952,9 +978,9 @@ function calculate(type) {
   if (dateError) dateError.textContent = "";
   if (result) result.innerHTML = "";
 
-  if (!name) { if (dateError) dateError.textContent = "Введите имя."; return; }
+  if (!name) { if (dateError) dateError.textContent = "Атыңызды енгізіңіз."; return; }
   if (!isValidBirthDate(birthDate)) {
-    if (dateError) dateError.textContent = "Введите корректную дату рождения в формате КК.АА.ЖЖЖЖ.";
+    if (dateError) dateError.textContent = "Туған күнді КК.АА.ЖЖЖЖ форматында дұрыс енгізіңіз.";
     return;
   }
 
@@ -986,6 +1012,24 @@ function calculate(type) {
   let moonSunYear = null, prognostikaYear = null;
   if (type === "moonsun") { moonSunYear = readYear("moonSunYear"); if (moonSunYear === null) return; }
   if (type === "prognostika") { prognostikaYear = readYear("prognostikaYear"); if (prognostikaYear === null) return; }
+  let bioStartDate = null;
+  if (type === "biorhythms") {
+    const startInput = document.getElementById("bioStartDate");
+    const startError = document.getElementById("bioStartDateError");
+    if (startError) startError.textContent = "";
+    const startRaw = startInput ? startInput.value.trim() : "";
+    if (!isValidBirthDate(startRaw)) {
+      if (startError) startError.textContent = "Есептеу басталатын күнді КК.АА.ЖЖЖЖ форматында енгізіңіз.";
+      return;
+    }
+    const [sd, sm, sy] = startRaw.split(".").map(Number);
+    const [bd, bm, by] = birthDate.split(".").map(Number);
+    if (Date.UTC(sy, sm - 1, sd) < Date.UTC(by, bm - 1, bd)) {
+      if (startError) startError.textContent = "Есептеу басталатын күн туған күннен ерте бола алмайды.";
+      return;
+    }
+    bioStartDate = startRaw;
+  }
 
   if (!result) return;
 
@@ -1006,6 +1050,13 @@ function calculate(type) {
     return;
   }
 
+  if (type === "biorhythms" && window.BiorhythmEngine) {
+    if (renderBiorhythmResult(name, birthDate, bioStartDate, result)) {
+      saveCalculationHistory({ direction: "biorhythms", title: "Биоырғақтар - " + name + " - " + birthDate, personName: name, birthDate });
+    }
+    return;
+  }
+
   if (type === "adult" && window.AdultMatrixEngine) {
     renderAdultMatrixResult(name, birthDate, result);
     saveCalculationHistory({ direction: "adult", title: "Ересек матрицасы - " + name + " - " + birthDate, personName: name, birthDate });
@@ -1018,7 +1069,7 @@ function calculate(type) {
   }
   if (type === "vedic" && window.VedicEngine) {
     renderVedicResult(name, birthDate, result);
-    saveCalculationHistory({ direction: "vedic", title: "Ведическая нумерология - " + name + " - " + birthDate, personName: name, birthDate });
+    saveCalculationHistory({ direction: "vedic", title: "Ведалық нумерология - " + name + " - " + birthDate, personName: name, birthDate });
     return;
   }
 
@@ -1584,7 +1635,7 @@ function forecastEnergyBlockHtml(num, idPrefix, idx) {
       parts.push(`<p style="margin:0;">${escapeHtml(data.negative)}</p>`);
     }
   } else {
-    parts.push(`<p>Текст для энергии ${escapeHtml(String(num))} не найден.</p>`);
+    parts.push(`<p>${escapeHtml(String(num))} энергиясының мәтіні табылмады.</p>`);
   }
   const body = parts.join("");
   return `<div class="accordion-item" style="border-color:rgba(225,180,52,.25);margin-bottom:0;"><button type="button" class="accordion-header" style="font-size:15px;padding:12px 14px;" onclick="toggleAccordionBody('${id}')"><span>Энергия ${escapeHtml(String(num))}</span><span>▾</span></button><div class="accordion-body" id="${id}" style="white-space:normal;">${body}</div></div>`;
@@ -1693,7 +1744,7 @@ function renderAdultMatrixResult(name, birthDate, container) {
     res = window.AdultMatrixEngine.getFullResult(day, month, year, name);
   } catch (error) {
     console.error("Ошибка расчёта матрицы:", error);
-    container.innerHTML = `<div style="color:#ff9d9d;padding:16px;">Не удалось выполнить расчёт: ${escapeHtml(error.message || String(error))}</div>`;
+    container.innerHTML = `<div style="color:#ff9d9d;padding:16px;">Есептеу орындалмады: ${escapeHtml(error.message || String(error))}</div>`;
     return;
   }
 
@@ -2106,7 +2157,7 @@ async function downloadAdultMatrixMobile(name, birthDate) {
     const pdfBlobs = [];
     for (let i = 0; i < requests.length; i++) {
       if (btn) btn.textContent = "Файл дайындап жатырмын... (" + (i + 1) + "/" + requests.length + ")";
-      const resp = await fetch("https://skvprhqsxnlacshucncq.supabase.co/functions/v1/generate-pdf", {
+      const resp = await fetch(SUPABASE_URL + "/functions/v1/generate-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + authToken },
         body: JSON.stringify(requests[i]),
@@ -2115,7 +2166,7 @@ async function downloadAdultMatrixMobile(name, birthDate) {
       pdfBlobs.push(await resp.arrayBuffer());
     }
 
-    if (btn) btn.textContent = "Склеиваю файл...";
+    if (btn) btn.textContent = "Файлды біріктіріп жатырмын...";
     const merged = await PDFLib.PDFDocument.create();
     for (const bytes of pdfBlobs) {
       const src = await PDFLib.PDFDocument.load(bytes);
@@ -2293,11 +2344,11 @@ function calculatePythagoras() {
   if (result) result.innerHTML = "";
 
   if (!lastName || !firstName) {
-    if (dateError) dateError.textContent = "Введите фамилию и имя.";
+    if (dateError) dateError.textContent = "Тегіңіз бен атыңызды енгізіңіз.";
     return;
   }
   if (!isValidBirthDate(birthDate)) {
-    if (dateError) dateError.textContent = "Введите корректную дату рождения в формате КК.АА.ЖЖЖЖ.";
+    if (dateError) dateError.textContent = "Туған күнді КК.АА.ЖЖЖЖ форматында дұрыс енгізіңіз.";
     return;
   }
   if (!result || !window.PythagorasEngine) return;
@@ -2309,7 +2360,7 @@ function calculatePythagoras() {
     res = window.PythagorasEngine.getFullResult(d, m, y, lastName, firstName, patronymic, alphabet);
   } catch (error) {
     console.error("Пифагор бойынша есептеу қатесі:", error);
-    result.innerHTML = `<div style="color:#ff9d9d;padding:16px;">Не удалось выполнить расчёт: ${escapeHtml(error.message || String(error))}</div>`;
+    result.innerHTML = `<div style="color:#ff9d9d;padding:16px;">Есептеу орындалмады: ${escapeHtml(error.message || String(error))}</div>`;
     return;
   }
 
@@ -2350,7 +2401,7 @@ function renderPythDigitSquare(psychomatrix, container) {
 
   if (q) {
     const qualityCards = [
-      ["Самооценка", "баған 1-2-3", q.samootsenka],
+      ["Өзін-өзі бағалау", "баған 1-2-3", q.samootsenka],
       ["Ақша құндылығы", "баған 4-5-6", q.tsennostDeneg],
       ["Талант әлеуеті", "баған 7-8-9", q.potentsialTalanta],
       ["Мақсаттылық", "жол 1-4-7", q.tseleustremlennost],
@@ -2371,10 +2422,10 @@ function renderPythDigitSquare(psychomatrix, container) {
         }).join("")}
       </div>
       <div style="border:1px solid rgba(225,180,52,.3);border-radius:10px;padding:12px 14px;color:#c9bfa8;font-size:12.5px;line-height:1.5;">
-        Пустая ячейка не значит «нет способностей» — это просто старт с нуля, качество можно наработать за жизнь.
-        Есть разные подходы к расчёту: в некоторых системах для родившихся в 2000 году и позже
-        в числовой ряд добавляют дополнительные цифры. Здесь мы этого не делаем — расчёт ведётся одинаково,
-        по единой формуле, независимо от года рождения
+        Бос ұяшық «қабілет жоқ» дегенді білдірмейді — бұл жай ғана нөлден бастау, бұл қасиетті өмір бойы дамытуға болады.
+        Есептеудің әртүрлі тәсілдері бар: кейбір жүйелерде 2000 жылы және одан кейін туғандар үшін
+        сандық қатарға қосымша сандар қосылады. Мұнда біз олай жасамаймыз — есептеу туған жылға қарамастан
+        бірыңғай формула бойынша бірдей жүргізіледі
       </div>`;
   }
 
@@ -2536,6 +2587,124 @@ function renderKarmicResult(name, birthDate, container) {
   return true;
 }
 
+/* ============================================================
+   БИОЫРҒАҚТАР
+   ============================================================ */
+// «Бүгінгі күн» батырмасы бар күн өрісі: күн құрылғының сағаты бойынша қойылады,
+// оны есептеу алдында қолмен түзетуге болады.
+function calcDateFieldHtml(id, label) {
+  return `
+        <label>${label}</label>
+        <div style="display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin:8px 0 5px;">
+          <input id="${id}" type="text" placeholder="КК.АА.ЖЖЖЖ" maxlength="10" inputmode="numeric" oninput="formatBirthDate(this)" value="${todayDdMmYyyy()}"
+            style="flex:1 1 180px;min-width:0;padding:13px;box-sizing:border-box;border:1px solid rgba(225,180,52,.5);border-radius:10px;background:rgba(0,0,0,.2);color:#fff;font-size:16px;">
+          <button type="button" onclick="document.getElementById('${id}').value = todayDdMmYyyy()"
+            style="flex:0 0 auto;padding:13px 16px;border:1px solid rgba(225,180,52,.5);border-radius:10px;background:rgba(0,0,0,.15);color:#f5d46b;font-size:15px;cursor:pointer;">Бүгінгі күн</button>
+        </div>
+        <div id="${id}Error" style="color:#ff9b9b;min-height:22px;margin-bottom:10px;"></div>`;
+}
+
+function todayDdMmYyyy() {
+  const d = new Date();
+  return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + d.getFullYear();
+}
+
+const BIO_COLORS = { phys: "#ff7a7a", emo: "#6fa8ff", intel: "#7ddc8f" };
+const BIO_WEEKDAYS = ["жс", "дс", "сс", "ср", "бс", "жм", "сб"];
+
+function bioDateLabel(date) {
+  return String(date.getUTCDate()).padStart(2, "0") + "." + String(date.getUTCMonth() + 1).padStart(2, "0") + "." + date.getUTCFullYear();
+}
+
+function buildBiorhythmChartSvg(rows, cycles) {
+  const w = 720, h = 300, padL = 44, padR = 12, padT = 16, padB = 40;
+  const n = rows.length, stepX = (w - padL - padR) / (n - 1);
+  const x = (i) => padL + i * stepX;
+  const y = (v) => padT + (1 - v) / 2 * (h - padT - padB);
+  let svg = "";
+  [1, 0.5, 0, -0.5, -1].forEach(function (v) {
+    svg += `<line x1="${padL}" x2="${w - padR}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="rgba(225,180,52,${v === 0 ? ".6" : ".2"})" stroke-width="1" ${v === 0 ? "" : 'stroke-dasharray="3 4"'}/>`;
+    svg += `<text x="${padL - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#c9bfa8">${Math.round(v * 100)}%</text>`;
+  });
+  rows.forEach(function (r, i) {
+    const wd = r.date.getUTCDay();
+    const weekend = wd === 0 || wd === 6;
+    svg += `<text x="${x(i).toFixed(1)}" y="${h - padB + 15}" text-anchor="middle" font-size="10" fill="${weekend ? "#f6d66c" : "#c9bfa8"}">${r.date.getUTCDate()}</text>`;
+    if (i === 0 || r.date.getUTCDate() === 1) {
+      svg += `<text x="${x(i).toFixed(1)}" y="${h - padB + 30}" text-anchor="${i === 0 ? "start" : "middle"}" font-size="10" fill="#c9bfa8">${String(r.date.getUTCMonth() + 1).padStart(2, "0")}.${r.date.getUTCFullYear()}</text>`;
+    }
+  });
+  const base = rows[0].daysLived;
+  cycles.forEach(function (c) {
+    let d = "";
+    for (let t = 0; t <= (n - 1) * 6; t++) {
+      const day = t / 6;
+      const v = Math.sin(2 * Math.PI * (base + day) / c.period);
+      d += (t ? "L" : "M") + (padL + day * stepX).toFixed(1) + "," + y(v).toFixed(1);
+    }
+    svg += `<path d="${d}" fill="none" stroke="${BIO_COLORS[c.key]}" stroke-width="2.4" stroke-linejoin="round"/>`;
+    rows.forEach(function (r, i) {
+      if (r[c.key].phase === "X") {
+        svg += `<circle cx="${x(i).toFixed(1)}" cy="${y(r[c.key].value).toFixed(1)}" r="4.5" fill="#f0a33c" stroke="${BIO_COLORS[c.key]}" stroke-width="2"/>`;
+      }
+    });
+  });
+  const legend = cycles.map(c => `<span style="white-space:nowrap;"><span style="display:inline-block;width:16px;height:3px;background:${BIO_COLORS[c.key]};vertical-align:middle;margin-right:5px;"></span>${c.name} (${c.period} күн)</span>`).join(" &nbsp; ")
+    + ` &nbsp; <span style="white-space:nowrap;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#f0a33c;vertical-align:middle;margin-right:5px;"></span>сыни күн</span>`;
+  return `
+    <div style="max-width:720px;margin:10px auto 22px;text-align:center;">
+      <div style="color:#f6d66c;font-family:PT Serif,Georgia,serif;font-size:16px;margin-bottom:6px;">Биоырғақтар: ${bioDateLabel(rows[0].date)} — ${bioDateLabel(rows[rows.length - 1].date)}</div>
+      <svg viewBox="0 0 ${w} ${h}" style="width:100%;max-width:720px;background:rgba(0,0,0,.15);border:1px solid rgba(215,170,49,.3);border-radius:10px;">${svg}</svg>
+      <div style="color:#c9bfa8;font-size:12px;margin-top:6px;line-height:1.7;">${legend}</div>
+      <div style="color:#a9bdb8;font-size:12px;margin-top:4px;">Нөлден жоғары — оң фаза, нөлден төмен — теріс фаза. Демалыс күндері сары түспен белгіленген.</div>
+    </div>`;
+}
+
+function renderBiorhythmResult(name, birthDate, startDate, container) {
+  const [bd, bm, by] = birthDate.split(".").map(Number);
+  const [sd, sm, sy] = startDate.split(".").map(Number);
+  const E = window.BiorhythmEngine;
+  let rows;
+  try {
+    rows = E.calcBiorhythms({ y: by, m: bm, d: bd }, { y: sy, m: sm, d: sd }, 31);
+  } catch (error) {
+    console.error("Биоырғақтарды есептеу қатесі:", error);
+    container.innerHTML = `<div style="color:#ff9d9d;padding:16px;">Есептеу орындалмады: ${escapeHtml(error.message || String(error))}</div>`;
+    return false;
+  }
+
+  const first = rows[0];
+  const blocks = [];
+  blocks.push({
+    title: bioDateLabel(first.date) + " күнгі жағдай — күн коды " + first.code,
+    entries: E.BIO_CYCLES.map(function (c) {
+      const st = first[c.key];
+      return {
+        number: c.name + ": " + (st.percent > 0 ? "+" : "") + st.percent + "%, " + c.period + " күннің " + st.dayOfCycle + "-күні, " + E.BIO_PHASE_NAMES[st.phase],
+        text: E.BIO_PHASE_TEXTS[c.key][st.phase]
+      };
+    }).concat([{ number: "Күн коды " + first.code, text: E.BIO_DAY_TEXTS[first.code] }])
+  });
+  blocks.push({
+    title: "Күндер бойынша талдау",
+    entries: rows.map(function (r) {
+      const marks = r.criticalCount === 3 ? " — үштік сыни күн" : r.criticalCount === 2 ? " — қос сыни күн" : r.criticalCount === 1 ? " — сыни күн" : "";
+      const detail = E.BIO_CYCLES.map(function (c) { return c.name[0] + ": " + r[c.key].dayOfCycle + "-күн, " + (r[c.key].percent > 0 ? "+" : "") + r[c.key].percent + "%"; }).join("; ");
+      return { number: bioDateLabel(r.date) + " (" + BIO_WEEKDAYS[r.date.getUTCDay()] + "), код " + r.code + marks, text: detail + "\n\n" + E.BIO_DAY_TEXTS[r.code] };
+    })
+  });
+  blocks.push({
+    title: "Күн кодын қалай оқу керек",
+    entries: [{ number: "", text: "Кодтың үш әрпі ретімен: физикалық, эмоционалдық, интеллектуалдық цикл.\nH — оң фаза, L — теріс фаза, X — сыни күн (фазаның ауысуы).\nСыни күндер: физикалық цикл — 1 және 12-күн, эмоционалдық — 1 және 15-күн, интеллектуалдық — 1 және 17-күн.\nБиоырғақтар оқиғаларды алдын ала белгілемейді, тек ықтимал көңіл-күйді көрсетеді." }]
+  });
+
+  renderEditableResult(blocks, container, "Биоырғақтар - " + name, birthDate + ", " + startDate + " бастап", "biorhythms");
+  container.insertAdjacentHTML("afterbegin", buildBiorhythmChartSvg(rows, E.BIO_CYCLES));
+  const firstBody = container.querySelector(".accordion-body");
+  if (firstBody) firstBody.classList.remove("hidden");
+  return true;
+}
+
 function renderEditableResult(blocks, container, personLabel, dateLabel, calculatorType) {
   let idCounter = 0;
   const nextId = () => "acc-edit-" + (idCounter++);
@@ -2651,7 +2820,7 @@ function calculateCompatibility() {
   if (result) result.innerHTML = "";
 
   if (!isValidBirthDate(birthDate1) || !isValidBirthDate(birthDate2)) {
-    if (dateError) dateError.textContent = "Введите обе даты рождения в формате КК.АА.ЖЖЖЖ.";
+    if (dateError) dateError.textContent = "Екі туған күнді де КК.АА.ЖЖЖЖ форматында енгізіңіз.";
     return;
   }
   if (!result || !window.CompatibilityEngine) return;
@@ -2664,15 +2833,15 @@ function calculateCompatibility() {
     res = window.CompatibilityEngine.getFullResult(d1, m1, y1, d2, m2, y2);
   } catch (error) {
     console.error("Ошибка расчёта совместимости:", error);
-    result.innerHTML = `<div style="color:#ff9d9d;padding:16px;">Не удалось выполнить расчёт: ${escapeHtml(error.message || String(error))}</div>`;
+    result.innerHTML = `<div style="color:#ff9d9d;padding:16px;">Есептеу орындалмады: ${escapeHtml(error.message || String(error))}</div>`;
     return;
   }
 
-  renderEditableResult(res.blocks, result, "Үйлесімділік - " + birthDate1 + " и " + birthDate2, "", "compatibility");
+  renderEditableResult(res.blocks, result, "Үйлесімділік - " + birthDate1 + " және " + birthDate2, "", "compatibility");
   renderCompatibilityDiagrams(d1, m1, y1, d2, m2, y2, result);
   saveCalculationHistory({
     direction: "compatibility",
-    title: "Үйлесімділік - " + birthDate1 + " и " + birthDate2,
+    title: "Үйлесімділік - " + birthDate1 + " және " + birthDate2,
     birthDate: birthDate1, birthDate2,
   });
 }
@@ -2733,11 +2902,11 @@ function renderVedicResult(name, birthDate, container) {
     res = window.VedicEngine.getFullResult(day, month, year, name);
   } catch (error) {
     console.error("Ошибка расчёта ведической нумерологии:", error);
-    container.innerHTML = `<div style="color:#ff9d9d;padding:16px;">Не удалось выполнить расчёт: ${escapeHtml(error.message || String(error))}</div>`;
+    container.innerHTML = `<div style="color:#ff9d9d;padding:16px;">Есептеу орындалмады: ${escapeHtml(error.message || String(error))}</div>`;
     return;
   }
 
-  renderEditableResult(res.blocks, container, "Ведическая нумерология - " + name, birthDate, "vedic");
+  renderEditableResult(res.blocks, container, "Ведалық нумерология - " + name, birthDate, "vedic");
   renderHoroscopeGrid(day, month, year, container);
   renderYantraGrid(day, month, year, container);
 }
@@ -2755,7 +2924,7 @@ function renderYantraGrid(day, month, year, container) {
   box.style.cssText = "max-width:640px;margin:20px auto;text-align:center;";
   box.innerHTML = `
     <div style="color:#f6d66c;font-family:PT Serif,Georgia,serif;font-size:18px;margin-bottom:4px;">Янтра</div>
-    <div style="color:#c9bfa8;font-size:13px;margin-bottom:14px;">Интегральное число: ${g.integral}</div>
+    <div style="color:#c9bfa8;font-size:13px;margin-bottom:14px;">Интегралдық сан: ${g.integral}</div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;border:1px solid #d7aa31;">
       ${cells.map(function (c) {
         return `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(215,170,49,.3);padding:10px 6px;">
@@ -2798,7 +2967,7 @@ function renderChildMatrixResult(name, birthDate, container) {
     res = window.ChildMatrixEngine.getFullResult(day, month, year, name);
   } catch (error) {
     console.error("Ошибка расчёта детской матрицы:", error);
-    container.innerHTML = `<div style="color:#ff9d9d;padding:16px;">Не удалось выполнить расчёт: ${escapeHtml(error.message || String(error))}</div>`;
+    container.innerHTML = `<div style="color:#ff9d9d;padding:16px;">Есептеу орындалмады: ${escapeHtml(error.message || String(error))}</div>`;
     return;
   }
 
@@ -2863,7 +3032,7 @@ async function openTestDirection(direction, title) {
             ${attempts.map(a => `
               <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid rgba(225,180,52,.15);font-size:14px;">
                 <span>${new Date(a.completed_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                <span style="color:#f6d66c;">${a.score} из ${a.total_questions}</span>
+                <span style="color:#f6d66c;">${a.score} / ${a.total_questions}</span>
               </div>`).join("")}
           </div>`;
       }
@@ -2922,7 +3091,7 @@ function renderTestQuestion() {
   testPageShell(`
       <button onclick="confirmInterruptTest()" style="background:none;border:none;color:#d7aa31;cursor:pointer;font-size:14px;margin-bottom:16px;">← Тестті тоқтату</button>
       <div>
-        <div style="color:#c9bfa8;font-size:14px;margin-bottom:6px;">${escapeHtml(title)} · Вопрос ${currentIndex + 1} из ${total}</div>
+        <div style="color:#c9bfa8;font-size:14px;margin-bottom:6px;">${escapeHtml(title)} · Сұрақ ${currentIndex + 1} / ${total}</div>
         <div style="height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin-bottom:20px;overflow:hidden;">
           <div style="height:100%;width:${((currentIndex + 1) / total) * 100}%;background:#d7aa31;"></div>
         </div>
@@ -2971,7 +3140,7 @@ async function finishTest() {
   const { direction, title, questions, answers } = testState;
 
   const unanswered = questions.filter(q => !answers[q.id]).length;
-  if (unanswered > 0 && !(await customConfirm(`Вы не ответили на ${unanswered} вопрос(ов). Тестті аяқтау всё равно?`))) {
+  if (unanswered > 0 && !(await customConfirm(`Сіз ${unanswered} сұраққа жауап бермедіңіз. Бәрібір тестті аяқтайсыз ба?`))) {
     return;
   }
 
@@ -3006,8 +3175,8 @@ function renderTestResult(score, total, answers, questions, direction, title) {
       <div style="text-align:center;">
         <div style="font-size:48px;margin-bottom:10px;">${percent >= 70 ? "🎉" : "📝"}</div>
         <h2 style="color:#f6d66c;font-family:PT Serif,Georgia,serif;font-weight:500;">Тест аяқталды</h2>
-        <p style="font-size:24px;color:#f8e7a8;margin:10px 0;">Дұрыс: <strong style="color:#f6d66c;">${score} из ${total}</strong></p>
-        <p style="color:#c9bfa8;font-size:14px;">Күні прохождения: ${dateStr}</p>
+        <p style="font-size:24px;color:#f8e7a8;margin:10px 0;">Дұрыс: <strong style="color:#f6d66c;">${score} / ${total}</strong></p>
+        <p style="color:#c9bfa8;font-size:14px;">Тапсырған күні: ${dateStr}</p>
 
         <div style="display:flex;gap:12px;margin-top:24px;justify-content:center;flex-wrap:wrap;">
           <button class="material-manager-button" style="width:auto;" onclick='reviewTestAnswers(${JSON.stringify(direction)},${JSON.stringify(title)})'>Жауаптарды қарау</button>
@@ -3027,7 +3196,7 @@ function reviewTestAnswers(direction, title) {
 
   testPageShell(`
       <button onclick="location.reload()" style="background:none;border:none;color:#d7aa31;cursor:pointer;font-size:14px;margin-bottom:16px;">← Тесттер тізіміне</button>
-      <h2 style="color:#f6d66c;font-family:PT Serif,Georgia,serif;font-weight:500;">${escapeHtml(title)} — разбор ответов</h2>
+      <h2 style="color:#f6d66c;font-family:PT Serif,Georgia,serif;font-weight:500;">${escapeHtml(title)} — жауаптарды талдау</h2>
       <div>
         ${questions.map((q, i) => {
           const userAns = answers[q.id];
@@ -3035,11 +3204,11 @@ function reviewTestAnswers(direction, title) {
           const options = { a: q.option_a, b: q.option_b, c: q.option_c, d: q.option_d };
           return `
             <div style="margin-bottom:20px;padding:16px;border-radius:12px;border:1px solid ${isCorrect ? "rgba(120,200,120,.4)" : "rgba(220,100,100,.4)"};background:rgba(255,255,255,.03);">
-              <div style="color:#c9bfa8;font-size:13px;margin-bottom:4px;">Вопрос ${i + 1}</div>
+              <div style="color:#c9bfa8;font-size:13px;margin-bottom:4px;">Сұрақ ${i + 1}</div>
               <div style="color:#f8e7a8;margin-bottom:10px;">${escapeHtml(q.question_text)}</div>
               <div style="font-size:14px;">
-                <div style="color:${isCorrect ? "#8fd98f" : "#ff9d9d"};">Ваш ответ: ${userAns ? letters[userAns] + ") " + escapeHtml(options[userAns]) : "не отвечено"}</div>
-                ${!isCorrect ? `<div style="color:#8fd98f;margin-top:4px;">Правильный ответ: ${letters[q.correct_option]}) ${escapeHtml(options[q.correct_option])}</div>` : ""}
+                <div style="color:${isCorrect ? "#8fd98f" : "#ff9d9d"};">Сіздің жауабыңыз: ${userAns ? letters[userAns] + ") " + escapeHtml(options[userAns]) : "жауап берілмеген"}</div>
+                ${!isCorrect ? `<div style="color:#8fd98f;margin-top:4px;">Дұрыс жауап: ${letters[q.correct_option]}) ${escapeHtml(options[q.correct_option])}</div>` : ""}
               </div>
             </div>`;
         }).join("")}
@@ -3084,7 +3253,7 @@ async function openDirectionMaterials(section, direction, title) {
         <div class="access-locked">
           <div class="access-locked-icon">🔒</div>
           <h2>Бұл бөлімге қолжетімділік жоқ</h2>
-          <p>Обратитесь к әкімшіу или учителю, чтобы открыть «${escapeHtml(title)}».</p>
+          <p>«${escapeHtml(title)}» бөлімін ашу үшін әкімшіге немесе ұстазға хабарласыңыз.</p>
         </div>
       </div>`;
     return;
@@ -3140,7 +3309,7 @@ async function loadDirectionMaterialsList() {
             <div class="material-row-meta">${meta}${date ? (meta ? " · " : "") + date : ""}</div>
           </div>
           <button class="material-row-open" onclick='openMaterialById(${JSON.stringify(item.id)})'>Ашу</button>
-          ${(window.currentUserRole === "admin" || item.created_by === window.currentUserId) ? `<button class="material-row-open" style="margin-left:8px;background:rgba(200,60,60,.35);" onclick='deleteMaterialById(${JSON.stringify(item.id)})' title="Удалить">🗑</button>` : ""}
+          ${(window.currentUserRole === "admin" || item.created_by === window.currentUserId) ? `<button class="material-row-open" style="margin-left:8px;background:rgba(200,60,60,.35);" onclick='deleteMaterialById(${JSON.stringify(item.id)})' title="Жою">🗑</button>` : ""}
         </div>`;
     }).join("");
   } catch (error) {
@@ -3292,7 +3461,7 @@ async function savePlatformMaterialUrl() {
   const input = document.getElementById("materialUrlInput");
   const url = input?.value.trim() || "";
 
-  if (!url) { setMaterialManagerStatus("Вставьте ссылку.", "error"); return; }
+  if (!url) { setMaterialManagerStatus("Сілтеме кірістіріңіз.", "error"); return; }
   try { new URL(url); } catch (_) {
     setMaterialManagerStatus("https:// немесе http://-дан басталатын дұрыс сілтеме енгізіңіз", "error");
     return;
@@ -3303,19 +3472,19 @@ async function savePlatformMaterialUrl() {
 
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) throw new Error("Сессия пользователя не найдена.");
+    if (!session) throw new Error("Пайдаланушы сессиясы табылмады.");
 
     const { error } = await supabaseClient.from(PLATFORM_MATERIALS_TABLE).insert({
       section, direction, material_type: "link", url, file_path: null, created_by: session.user.id
     });
     if (error) throw error;
 
-    setMaterialManagerStatus("Сілтеме сохранена.", "ok");
+    setMaterialManagerStatus("Сілтеме сақталды.", "ok");
     await loadDirectionMaterialsList();
     setTimeout(() => document.getElementById("materialManager")?.remove(), 700);
   } catch (error) {
     console.error("Ошибка сохранения ссылки:", error);
-    setMaterialManagerStatus("Не удалось сохранить ссылку: " + (error.message || error), "error");
+    setMaterialManagerStatus("Сілтемені сақтау мүмкін болмады: " + (error.message || error), "error");
   } finally {
     setMaterialManagerBusy(false);
   }
@@ -3343,7 +3512,7 @@ async function uploadPlatformMaterialFile() {
 
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) throw new Error("Сессия пользователя не найдена.");
+    if (!session) throw new Error("Пайдаланушы сессиясы табылмады.");
 
     const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/^_+|_+$/g, "") || "file";
     const unique = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + "_" + Math.random().toString(36).slice(2);
@@ -3370,7 +3539,7 @@ async function uploadPlatformMaterialFile() {
     setTimeout(() => document.getElementById("materialManager")?.remove(), 700);
   } catch (error) {
     console.error("Ошибка загрузки файла:", error);
-    setMaterialManagerStatus("Не удалось загрузить файл: " + (error.message || error), "error");
+    setMaterialManagerStatus("Файлды жүктеу мүмкін болмады: " + (error.message || error), "error");
   } finally {
     setMaterialManagerBusy(false);
   }
@@ -3542,7 +3711,7 @@ async function saveLibraryLink(id) {
    МОИ РАСЧЁТЫ
    ============================================================ */
 
-const DIRECTION_ORDER = ["adult", "child", "compatibility", "moonsun", "prognostika", "karmic"];
+const DIRECTION_ORDER = ["adult", "child", "compatibility", "moonsun", "prognostika", "karmic", "biorhythms"];
 
 function paginatedTableHtml(containerId, headerHtml, rowsHtmlArray, pageSize) {
   pageSize = pageSize || 15;
@@ -3569,11 +3738,13 @@ function setPaginatedPage(containerId, headerHtml, page, pageSize) {
 }
 
 function calcStatsByDirection(rows) {
-  const counts = Object.fromEntries(DIRECTION_ORDER.map((d) => [d, 0]));
-  rows.forEach((r) => { if (counts[r.direction] !== undefined) counts[r.direction]++; });
+  const shownDirections = DIRECTION_ORDER.filter((d) => isDirectionVisible(d));
+  const counts = Object.fromEntries(shownDirections.map((d) => [d, 0]));
+  rows = rows.filter((r) => counts[r.direction] !== undefined);
+  rows.forEach((r) => { counts[r.direction]++; });
   return `<div class="stats-grid">` +
-    DIRECTION_ORDER.map((d) => `<div class="stat-card"><span>${escapeHtml(DIRECTION_NAMES[d] || d)}</span><strong>${counts[d]}</strong></div>`).join("") +
-    `<div class="stat-card"><span>Всего</span><strong>${rows.length}</strong></div>` +
+    shownDirections.map((d) => `<div class="stat-card"><span>${escapeHtml(DIRECTION_NAMES[d] || d)}</span><strong>${counts[d]}</strong></div>`).join("") +
+    `<div class="stat-card"><span>Барлығы</span><strong>${rows.length}</strong></div>` +
     `</div>`;
 }
 
@@ -3714,8 +3885,8 @@ async function applyTeacherCode() {
   const code = (input?.value || "").trim().toUpperCase();
   const setMsg = (text, ok) => { if (msg) { msg.textContent = text; msg.style.color = ok ? "#8fe3a1" : "#ff9d9d"; } };
 
-  if (!code) { setMsg("Введите код.", false); return; }
-  setMsg("Проверяю код...", true);
+  if (!code) { setMsg("Кодты енгізіңіз.", false); return; }
+  setMsg("Кодты тексеріп жатырмын...", true);
 
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -3729,12 +3900,12 @@ async function applyTeacherCode() {
     const { error: updateError } = await supabaseClient.from("profiles").update({ teacher_id: match.id }).eq("id", session.user.id);
     if (updateError) throw updateError;
 
-    setMsg("Готово, вы прикреплены к учителю.", true);
+    setMsg("Дайын, сіз ұстазға бекітілдіңіз.", true);
     const box = document.getElementById("studentTeacherCodeBox");
     if (box) setTimeout(() => { box.style.display = "none"; }, 1200);
   } catch (error) {
     console.error("Ошибка применения кода учителя:", error);
-    setMsg("Не удалось применить код: " + (error.message || "Supabase қатесі"), false);
+    setMsg("Кодты қолдану мүмкін болмады: " + (error.message || "Supabase қатесі"), false);
   }
 }
 
@@ -3801,10 +3972,10 @@ async function renderAccess() {
         if (!item.ends_at) return `<span style="color:#8fe3a1;">ашық</span>`;
         const active = new Date(item.ends_at) >= new Date();
         const date = new Date(item.ends_at).toLocaleDateString("ru-RU");
-        return active ? `<span style="color:#8fe3a1;">до ${date}</span>` : `<span style="color:#ff9d9d;">истёк ${date}</span>`;
+        return active ? `<span style="color:#8fe3a1;">${date} дейін</span>` : `<span style="color:#ff9d9d;">${date} аяқталды</span>`;
       };
 
-      const dirRows = DIRECTIONS.map(function (d) {
+      const dirRows = DIRECTIONS.filter(function (d) { return isDirectionVisible(d.key); }).map(function (d) {
         const row = scope[d.key] || {};
         return `<tr>
           <td>${escapeHtml(DIRECTION_NAMES[d.key])}</td>
@@ -3852,8 +4023,8 @@ async function renderAccess() {
     <div class="dashboard-wrap">
       <div class="dashboard-head">
         <div>
-          <h2>${isRealAdmin ? "Қолжетімділіктер пользователей" : "My Students"}</h2>
-          <p>${isRealAdmin ? "Управление доступом всех зарегистрированных пользователей." : "Қолжетімділік виден и управляется только для ваших учеников и учениц."}</p>
+          <h2>${isRealAdmin ? "Пайдаланушылардың қолжетімділіктері" : "My Students"}</h2>
+          <p>${isRealAdmin ? "Барлық тіркелген пайдаланушылардың қолжетімділігін басқару." : "Қолжетімділік тек сіздің оқушыларыңыз үшін көрінеді және басқарылады."}</p>
         </div>
         <div class="dashboard-badge">${isRealAdmin ? "Admin" : "Teacher"}</div>
       </div>
@@ -3882,7 +4053,7 @@ async function renderAccess() {
         </div>
 
         <label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer;">
-          <input type="checkbox" id="scopeSelectAll" onchange="toggleScopeAll(this.checked)"> Выбрать всё
+          <input type="checkbox" id="scopeSelectAll" onchange="toggleScopeAll(this.checked)"> Барлығын таңдау
         </label>
 
         <div style="overflow-x:auto;margin-bottom:16px;">
@@ -3891,10 +4062,13 @@ async function renderAccess() {
               <tr><th>Бағыт</th>${CONTENT_TYPES.map(c => `<th>${c.label}</th>`).join("")}<th>Мерзім</th></tr>
             </thead>
             <tbody>
-              ${DIRECTIONS.map(d => `
+              ${DIRECTIONS.filter(d => isDirectionVisible(d.key)).map(d => `
                 <tr>
                   <td>${escapeHtml(DIRECTION_NAMES[d.key])}</td>
-                  ${CONTENT_TYPES.map(c => `<td><input type="checkbox" class="scope-cell" data-direction="${d.key}" data-type="${c.key}"></td>`).join("")}
+                  ${CONTENT_TYPES.map(c => `<td style="white-space:nowrap;">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:6px;"><input type="checkbox" class="scope-visible" data-direction="${d.key}" data-type="${c.key}"> белгіше көрінеді</label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" class="scope-cell" data-direction="${d.key}" data-type="${c.key}"> қолжетімділік</label>
+                  </td>`).join("")}
                   <td>${termSelectHtml("scope-term-row", `data-direction="${d.key}"`)}</td>
                 </tr>`).join("")}
             </tbody>
@@ -3969,7 +4143,7 @@ async function renderAccess() {
       </div>` : ""}
 
       <div class="table-card">
-        <div class="table-title">${isRealAdmin ? "Тіркелгенные пользователи" : "My Students"}</div>
+        <div class="table-title">${isRealAdmin ? "Тіркелген пайдаланушылар" : "My Students"}</div>
         <div id="adminUsersTable">Жүктелуде...</div>
       </div>
       <div class="table-card" style="margin-top:18px;">
@@ -3999,8 +4173,8 @@ async function saveTeacherSchoolName() {
   const name = (input?.value || "").trim();
   const setMsg = (text, ok) => { if (msg) { msg.textContent = text; msg.style.color = ok ? "#8fe3a1" : "#ff9d9d"; } };
 
-  if (!name) { setMsg("Введите название школы.", false); return; }
-  setMsg("Сохраняю...", true);
+  if (!name) { setMsg("Мектептің атауын енгізіңіз.", false); return; }
+  setMsg("Сақтап жатырмын...", true);
 
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -4017,10 +4191,10 @@ async function saveTeacherSchoolName() {
     }
 
     await supabaseClient.from("profiles").update({ school_id: schoolId }).eq("id", session.user.id);
-    setMsg("Сохранено.", true);
+    setMsg("Сақталды.", true);
   } catch (error) {
     console.error("Ошибка сохранения школы:", error);
-    setMsg("Не удалось сохранить: " + (error.message || error), false);
+    setMsg("Сақтау мүмкін болмады: " + (error.message || error), false);
   }
 }
 
@@ -4084,7 +4258,7 @@ async function loadAdminUsers() {
     if (user.role !== "student" && user.role !== "numerologist") return "";
     const latest = accessByUser[user.id];
     if (!latest) return `<div style="font-size:11px;color:#8a8098;margin-top:3px;">Қолжетімділік берілмеген</div>`;
-    if (hasActivePlatformAccess(latest)) return `<div style="font-size:11px;color:#8fd18f;margin-top:3px;">Қолжетімділік активен${latest.is_unlimited ? "" : (latest.ends_at ? " до " + new Date(latest.ends_at).toLocaleDateString("ru-RU") : "")}</div>`;
+    if (hasActivePlatformAccess(latest)) return `<div style="font-size:11px;color:#8fd18f;margin-top:3px;">Қолжетімділік белсенді${latest.is_unlimited ? "" : (latest.ends_at ? " — " + new Date(latest.ends_at).toLocaleDateString("ru-RU") + " дейін" : "")}</div>`;
     return `<div style="font-size:11px;color:#e8a94e;margin-top:3px;">Қолжетімділік мерзімі өтті <button type="button" onclick='scrollToGrantAccess(${JSON.stringify(user.id)})' style="margin-left:4px;padding:2px 8px;font-size:11px;border-radius:8px;border:1px solid #d7aa31;background:linear-gradient(90deg,#3c8783,#2f6d6a);color:#f8d96d;cursor:pointer;">Жаңарту</button></div>`;
   }
 
@@ -4124,14 +4298,14 @@ async function loadAdminUsers() {
   if (!users.length) {
     box.innerHTML = backLink + `<div class="empty-table">${
       adminUsersFilterTeacher
-        ? "У этого учителя пока нет оқушылар."
-        : (isRealAdmin ? "Тіркелгенных пользователей пока нет." : "У вас пока нет оқушылар. Попросите әкімшіа прикрепить их к вам.")
+        ? "Бұл ұстазда әзірге оқушылар жоқ."
+        : (isRealAdmin ? "Әзірге тіркелген пайдаланушылар жоқ." : "Сізде әзірге оқушылар жоқ. Әкімшіден оларды сізге бекітуді сұраңыз.")
     }</div>`;
     return;
   }
 
   const teacherName = (teacherId) => {
-    if (!teacherId) return "Не назначен";
+    if (!teacherId) return "Тағайындалмаған";
     const t = users.find(u => u.id === teacherId);
     return t ? nameOf(t) : "—";
   };
@@ -4155,9 +4329,9 @@ async function loadAdminUsers() {
             <td>${escapeHtml(user.email || "—")}</td>
             <td>${escapeHtml(user.phone || "—")}</td>
             <td>${escapeHtml(roleLabel(user.role))}</td>
-            <td>${user.created_at ? new Date(user.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+            <td>${user.created_at ? new Date(user.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}${user.restored_at ? " / " + new Date(user.restored_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}</td>
             ${isRealAdmin ? `${codeCell}<td>${user.role === "student" ? escapeHtml(teacherName(user.teacher_id)) : "—"}</td>` : ""}
-            <td>${statusLabel(user.status)}${user.restored_at ? ` <span style="color:#8fd18f;font-size:11px;">(восстановлен ${new Date(user.restored_at).toLocaleDateString("ru-RU")})</span>` : ""}${accessBadge(user)}</td>
+            <td>${statusLabel(user.status)}${user.restored_at ? ` <span style="color:#8fd18f;font-size:11px;">(қалпына келтірілді ${new Date(user.restored_at).toLocaleDateString("ru-RU")})</span>` : ""}${accessBadge(user)}</td>
             ${user.role === "admin" ? (isRealAdmin ? "<td>—</td>" : "") : `<td><button type="button" class="material-manager-button" style="width:auto;padding:6px 10px;font-size:12px;" onclick='deleteUserAccount(${JSON.stringify(user.id)}, ${JSON.stringify(nameOf(user))})'>Жою</button></td>`}
           </tr>`;
         }).join("")}
@@ -4191,7 +4365,7 @@ function deleteUserAccount(userId, name) {
   }
   showModal(`
     <h3 style="margin-top:0;color:#f6d66c;font-family:PT Serif,Georgia,serif;">Аккаунтты жою керек пе?</h3>
-    <p>Удалить аккаунт «${escapeHtml(name)}»? Человек потеряет доступ и не сможет войти, но данные сохранятся — при необходимости аккаунт можно будет восстановить в разделе «${window.currentUserRole === "admin" ? "Жойылған аккаунттар журналы" : "Жойылған оқушылар"}».</p>
+    <p>«${escapeHtml(name)}» аккаунтын жою керек пе? Адам қолжетімділіктен айырылып, кіре алмайды, бірақ деректер сақталады — қажет болса, аккаунтты «${window.currentUserRole === "admin" ? "Жойылған аккаунттар журналы" : "Жойылған оқушылар"}» бөлімінде қалпына келтіруге болады.</p>
     <div id="deleteModalMessage" style="margin:10px 0;"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button type="button" class="material-manager-button" style="width:auto;background:transparent;border:1px solid rgba(225,180,52,.4);" onclick="closeModal()">Бас тарту</button>
@@ -4206,7 +4380,7 @@ async function confirmDeleteUser(userId) {
   if (btn) { btn.disabled = true; btn.textContent = "Жойып жатырмын..."; }
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const resp = await fetch("https://skvprhqsxnlacshucncq.supabase.co/functions/v1/delete-user", {
+    const resp = await fetch(SUPABASE_URL + "/functions/v1/delete-user", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token },
       body: JSON.stringify({ userId, action: "delete" }),
@@ -4218,7 +4392,7 @@ async function confirmDeleteUser(userId) {
   } catch (error) {
     console.error("Пайдаланушыны жою қатесі:", error);
     if (msg) { msg.textContent = "Аккаунтты жою мүмкін болмады: " + (error.message || error); msg.style.color = "#ff9d9d"; }
-    if (btn) { btn.disabled = false; btn.textContent = "Удалить"; }
+    if (btn) { btn.disabled = false; btn.textContent = "Жою"; }
   }
 }
 
@@ -4230,7 +4404,7 @@ async function showUserDetailModal(userId) {
       .select("first_name, last_name, middle_name, email, phone, role, teacher_id, created_at")
       .eq("id", userId)
       .single();
-    if (error || !profile) throw error || new Error("Не найдено");
+    if (error || !profile) throw error || new Error("Табылмады");
 
     let teacherLabel = "—";
     if (profile.teacher_id) {
@@ -4289,7 +4463,7 @@ async function loadDeletedUsersLog() {
 
   let query = supabaseClient
     .from("profiles")
-    .select("id, first_name, last_name, email, role, created_at, deleted_at, deleted_by, teacher_id, status")
+    .select("id, first_name, last_name, email, role, created_at, deleted_at, deleted_by, teacher_id, status, restored_at")
     .in("status", ["deleted", "active"])
     .order("deleted_at", { ascending: false });
   if (!isRealAdmin) query = query.eq("teacher_id", session.user.id);
@@ -4301,7 +4475,7 @@ async function loadDeletedUsersLog() {
   const deletedProfiles = allProfiles.filter(p => p.status === "deleted");
   const activeCandidates = allProfiles.filter(p => p.status !== "deleted" && (p.role === "student" || p.role === "numerologist"));
 
-  // Подтягиваем имена тех, кто удалял (админ или конкретный учитель), одним запросом.
+  // Кім жойғанын (әкімші немесе нақты ұстаз) бір сұраныспен аламыз.
   const deleterIds = [...new Set(deletedProfiles.map(r => r.deleted_by).filter(Boolean))];
   const deleterNameById = {};
   if (deleterIds.length) {
@@ -4311,15 +4485,53 @@ async function loadDeletedUsersLog() {
     });
   }
 
-  const restorable = deletedProfiles.map(r => ({
+  const fmtDT = (v) => v ? new Date(v).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+  const profileById = {};
+  allProfiles.forEach(p => { profileById[p.id] = p; });
+
+  // Оқиғалар журналы: әр жою және әр қалпына келтіру — жеке жол, ештеңе жоғалмайды.
+  const { data: eventsData } = await supabaseClient
+    .from("account_events")
+    .select("id, user_id, email, first_name, last_name, role, registered_at, event, event_at, actor_id")
+    .order("event_at", { ascending: false });
+  const events = eventsData || [];
+  const actorIds = [...new Set(events.map(e => e.actor_id).filter(Boolean).filter(id => !deleterNameById[id]))];
+  if (actorIds.length) {
+    const { data: actors } = await supabaseClient.from("profiles").select("id, role, first_name, last_name, email").in("id", actorIds);
+    (actors || []).forEach(d => { deleterNameById[d.id] = d.role === "admin" ? "Admin" : ("Teacher: " + ([d.last_name, d.first_name].filter(Boolean).join(" ") || d.email)); });
+  }
+  const latestEventId = {};
+  events.forEach(e => { if (!latestEventId[e.user_id]) latestEventId[e.user_id] = e.id; });
+
+  const eventRows = events.map(e => {
+    const prof = profileById[e.user_id];
+    const nm = [e.last_name, e.first_name].filter(Boolean).join(" ");
+    let action = `<span style="color:#8a8098;font-size:12px;">—</span>`;
+    if (latestEventId[e.user_id] === e.id) {
+      if (prof && prof.status === "deleted") {
+        action = `<button type="button" class="material-manager-button" style="width:auto;padding:6px 10px;font-size:12px;" onclick='restoreUserAccount(${JSON.stringify(e.user_id)}, ${JSON.stringify(nm || e.email)})'>Қалпына келтіру</button>`;
+      } else if (!prof && e.event === "deleted" && isRealAdmin) {
+        action = `<span style="color:#8a8098;font-size:12px;">Мүлдем жойылды</span>`;
+      }
+    }
+    return {
+      id: prof ? e.user_id : null, email: e.email, name: nm,
+      role: e.role, registered_at: e.registered_at, restored_at: prof ? prof.restored_at : null, sortDate: e.event_at,
+      statusLabel: (e.event === "restored" ? "Қалпына келтірілді " : "Жойылды ") + fmtDT(e.event_at),
+      accessLabel: deleterNameById[e.actor_id] || "—",
+      action,
+    };
+  });
+  // Журналда жазбасы жоқ жойылған аккаунттар — қалпына келтіру үшін оларды да көрсетеміз.
+  const restorable = deletedProfiles.filter(r => !latestEventId[r.id]).map(r => ({
     id: r.id, email: r.email, name: [r.last_name, r.first_name].filter(Boolean).join(" "),
-    role: r.role, registered_at: r.created_at, sortDate: r.deleted_at,
-    statusLabel: "Жойылды " + (r.deleted_at ? new Date(r.deleted_at).toLocaleDateString("ru-RU") : ""),
+    role: r.role, registered_at: r.created_at, restored_at: r.restored_at, sortDate: r.deleted_at,
+    statusLabel: "Жойылды " + fmtDT(r.deleted_at),
     accessLabel: deleterNameById[r.deleted_by] || "—",
     action: `<button type="button" class="material-manager-button" style="width:auto;padding:6px 10px;font-size:12px;" onclick='restoreUserAccount(${JSON.stringify(r.id)}, ${JSON.stringify([r.last_name, r.first_name].filter(Boolean).join(" ") || r.email)})'>Қалпына келтіру</button>`,
   }));
 
-  // Истёкший срок доступа — не удаление, но тоже требует внимания: показываем в том же журнале отдельной пометкой.
+  // Қолжетімділік мерзімінің өтуі — жою емес, бірақ назар аударуды қажет етеді: сол журналда бөлек белгімен көрсетеміз.
   let expired = [];
   if (activeCandidates.length) {
     const { data: periods } = await supabaseClient
@@ -4334,40 +4546,18 @@ async function loadDeletedUsersLog() {
       .filter(x => x.period && !x.period.is_unlimited && !hasActivePlatformAccess(x.period))
       .map(({ profile: r, period }) => {
         const days = Math.max(1, Math.round((new Date(period.ends_at) - new Date(period.starts_at)) / 86400000));
-        const durationLabel = days >= 28 ? Math.round(days / 30) + " ай" : days + " күн.";
+        const durationLabel = days >= 28 ? Math.round(days / 30) + " ай" : days + " күн";
         return {
           id: r.id, email: r.email, name: [r.last_name, r.first_name].filter(Boolean).join(" "),
-          role: r.role, registered_at: r.created_at, sortDate: period.ends_at,
-          statusLabel: "Истёк срок " + new Date(period.ends_at).toLocaleDateString("ru-RU"),
-          accessLabel: `Истёк срок (${durationLabel})`,
+          role: r.role, registered_at: r.created_at, restored_at: r.restored_at, sortDate: period.ends_at,
+          statusLabel: "Мерзімі өтті " + new Date(period.ends_at).toLocaleDateString("ru-RU"),
+          accessLabel: `Мерзімі өтті (${durationLabel})`,
           action: `<button type="button" class="material-manager-button" style="width:auto;padding:6px 10px;font-size:12px;" onclick='scrollToGrantAccess(${JSON.stringify(r.id)})'>Жаңарту</button>`,
         };
       });
   }
 
-  let legacy = [];
-  if (isRealAdmin) {
-    // Старые аккаунты, удалённые ещё до того, как удаление стало обратимым — они удалены
-    // окончательно и восстановлению не подлежат, но остаются в журнале как история.
-    const { data: legacyData } = await supabaseClient
-      .from("deleted_users_log")
-      .select("email, first_name, last_name, role, registered_at, deleted_at, deleted_by")
-      .order("deleted_at", { ascending: false });
-    const legacyDeleterIds = [...new Set((legacyData || []).map(r => r.deleted_by).filter(Boolean).filter(id => !deleterNameById[id]))];
-    if (legacyDeleterIds.length) {
-      const { data: moreDeleters } = await supabaseClient.from("profiles").select("id, role, first_name, last_name, email").in("id", legacyDeleterIds);
-      (moreDeleters || []).forEach(d => { deleterNameById[d.id] = d.role === "admin" ? "Admin" : ("Teacher: " + ([d.last_name, d.first_name].filter(Boolean).join(" ") || d.email)); });
-    }
-    legacy = (legacyData || []).map(r => ({
-      id: null, email: r.email, name: [r.last_name, r.first_name].filter(Boolean).join(" "),
-      role: r.role, registered_at: r.registered_at, sortDate: r.deleted_at,
-      statusLabel: "Жойылды " + (r.deleted_at ? new Date(r.deleted_at).toLocaleDateString("ru-RU") : ""),
-      accessLabel: deleterNameById[r.deleted_by] || "—",
-      action: `<span style="color:#8a8098;font-size:12px;">Мүлдем жойылды</span>`,
-    }));
-  }
-
-  const rows = [...restorable, ...expired, ...legacy].sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
+  const rows = [...eventRows, ...restorable, ...expired].sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
   if (!rows.length) { box.innerHTML = `<div class="empty-table">Әлі ешкім жойылған жоқ және ешкімнің мерзімі өтпеген.</div>`; return; }
 
   const headerHtml = `<thead><tr><th>Email</th><th>Аты</th><th>Рөл</th><th>Тіркелген</th><th>Мәртебе</th><th>Қолжетімділік</th><th>Әрекет</th></tr></thead>`;
@@ -4376,7 +4566,7 @@ async function loadDeletedUsersLog() {
             <td>${r.id ? `<a href="javascript:void(0)" style="color:#8a8098;text-decoration:underline;" onclick='showUserDetailModal(${JSON.stringify(r.id)})'>${escapeHtml(r.email || "—")}</a>` : escapeHtml(r.email || "—")}</td>
             <td>${escapeHtml(r.name || "—")}</td>
             <td>${escapeHtml(roleLabel(r.role))}</td>
-            <td>${r.registered_at ? new Date(r.registered_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+            <td>${r.registered_at ? fmtDT(r.registered_at) : "—"}${r.restored_at ? " / " + fmtDT(r.restored_at) : ""}</td>
             <td>${escapeHtml(r.statusLabel)}</td>
             <td>${escapeHtml(r.accessLabel)}</td>
             <td>${r.action}</td>
@@ -4387,7 +4577,7 @@ async function loadDeletedUsersLog() {
 async function restoreUserAccount(userId, name) {
   showModal(`
     <h3 style="margin-top:0;color:#f6d66c;font-family:PT Serif,Georgia,serif;">Аккаунтты қалпына келтіру керек пе?</h3>
-    <p>Қалпына келтіру доступ для «${escapeHtml(name)}»? Человек снова сможет войти под своим email и паролем, дата будет отмечена как «дата восстановления».</p>
+    <p>«${escapeHtml(name)}» үшін қолжетімділікті қалпына келтіру керек пе? Адам өз email-і мен құпия сөзі арқылы қайта кіре алады, күні «қалпына келтірілген күн» ретінде белгіленеді.</p>
     <div id="restoreModalMessage" style="margin:10px 0;"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button type="button" class="material-manager-button" style="width:auto;background:transparent;border:1px solid rgba(225,180,52,.4);" onclick="closeModal()">Бас тарту</button>
@@ -4402,7 +4592,7 @@ async function confirmRestoreUser(userId) {
   if (btn) { btn.disabled = true; btn.textContent = "Қалпына келтіріп жатырмын..."; }
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    const resp = await fetch("https://skvprhqsxnlacshucncq.supabase.co/functions/v1/delete-user", {
+    const resp = await fetch(SUPABASE_URL + "/functions/v1/delete-user", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token },
       body: JSON.stringify({ userId, action: "restore" }),
@@ -4429,16 +4619,16 @@ async function setUserRole() {
   const message = document.getElementById("roleAdminMessage");
   const setMsg = (text, ok) => { if (message) { message.textContent = text; message.style.color = ok ? "#8fe3a1" : "#ff9d9d"; } };
 
-  if (!userId) { setMsg("Сначала выберите пользователя.", false); return; }
-  setMsg("Назначаю роль...", true);
+  if (!userId) { setMsg("Алдымен пайдаланушыны таңдаңыз.", false); return; }
+  setMsg("Рөлді тағайындап жатырмын...", true);
 
   const { error } = await supabaseClient.from("profiles").update({ role }).eq("id", userId);
   if (error) {
     console.error("Ошибка назначения роли:", error);
-    setMsg("Не удалось назначить роль: " + (error.message || "Supabase қатесі"), false);
+    setMsg("Рөлді тағайындау мүмкін болмады: " + (error.message || "Supabase қатесі"), false);
     return;
   }
-  setMsg("Рөл назначена.", true);
+  setMsg("Рөл тағайындалды.", true);
   await loadAdminUsers();
 }
 
@@ -4448,25 +4638,25 @@ async function attachStudentToTeacher() {
   const message = document.getElementById("attachAdminMessage");
   const setMsg = (text, ok) => { if (message) { message.textContent = text; message.style.color = ok ? "#8fe3a1" : "#ff9d9d"; } };
 
-  if (!studentId || !teacherId) { setMsg("Выберите Student и Teacher.", false); return; }
-  setMsg("Прикрепляю...", true);
+  if (!studentId || !teacherId) { setMsg("Student пен Teacher таңдаңыз.", false); return; }
+  setMsg("Бекітіп жатырмын...", true);
 
   const { error } = await supabaseClient.from("profiles").update({ teacher_id: teacherId }).eq("id", studentId);
   if (error) {
     console.error("Ошибка прикрепления:", error);
-    setMsg("Не удалось прикрепить: " + (error.message || "Supabase қатесі"), false);
+    setMsg("Бекіту мүмкін болмады: " + (error.message || "Supabase қатесі"), false);
     return;
   }
-  setMsg("Student прикреплён к Teacher.", true);
+  setMsg("Student Teacher-ге бекітілді.", true);
   await loadAdminUsers();
 }
 
 const TERM_OPTIONS = [
-  { value: "unlimited", label: "Бессрочно" },
-  { value: "30", label: "1 месяц" },
-  { value: "90", label: "3 месяца" },
-  { value: "180", label: "6 месяцев" },
-  { value: "365", label: "12 месяцев" }
+  { value: "unlimited", label: "Мерзімсіз" },
+  { value: "30", label: "1 ай" },
+  { value: "90", label: "3 ай" },
+  { value: "180", label: "6 ай" },
+  { value: "365", label: "12 ай" }
 ];
 
 function termSelectHtml(extraClass, attrs) {
@@ -4483,7 +4673,7 @@ function computeEndsAt(termValue) {
 }
 
 function toggleScopeAll(checked) {
-  document.querySelectorAll(".scope-cell, .scope-flag").forEach(function (el) { el.checked = checked; });
+  document.querySelectorAll(".scope-cell, .scope-flag, .scope-visible").forEach(function (el) { el.checked = checked; });
 }
 
 function fillScopeCheckboxes(scope) {
@@ -4505,13 +4695,18 @@ function fillScopeCheckboxes(scope) {
   setFlag("scopeMyCalc", "scopeMyCalcTerm", scope.my_calculations);
   setFlag("scopeAccess", "scopeAccessTerm", scope.access);
   setFlag("scopeStatistics", "scopeStatisticsTerm", scope.statistics);
+  document.querySelectorAll(".scope-visible").forEach(function (el) {
+    const dirScope = scope[el.dataset.direction] || {};
+    const vt = dirScope.visible_types;
+    el.checked = (vt && typeof vt === "object") ? vt[el.dataset.type] === true : dirScope.visible === true;
+  });
   const allBox = document.getElementById("scopeSelectAll");
-  if (allBox) allBox.checked = Array.from(document.querySelectorAll(".scope-cell, .scope-flag")).every(el => el.checked);
+  if (allBox) allBox.checked = Array.from(document.querySelectorAll(".scope-cell, .scope-flag, .scope-visible")).every(el => el.checked);
 }
 
 async function loadScopeForSelectedUser() {
   const userId = document.getElementById("accessUserSelect")?.value || "";
-  document.querySelectorAll(".scope-cell, .scope-flag").forEach(function (el) { el.checked = false; });
+  document.querySelectorAll(".scope-cell, .scope-flag, .scope-visible").forEach(function (el) { el.checked = false; });
   if (!userId) return;
   const { data, error } = await supabaseClient
     .from("access_periods")
@@ -4536,6 +4731,14 @@ function collectScope() {
     scope[dir][type] = Object.assign({ granted: true }, computeEndsAt(term));
   });
 
+  document.querySelectorAll(".scope-visible").forEach(function (el) {
+    const dir = scope[el.dataset.direction];
+    dir.visible_types = dir.visible_types || {};
+    dir.visible_types[el.dataset.type] = el.checked;
+    if (el.checked) dir.visible = true;
+    else if (dir.visible !== true) dir.visible = false;
+  });
+
   const libChecked = document.getElementById("scopeLibrary")?.checked;
   const libTerm = document.getElementById("scopeLibraryTerm")?.value || "unlimited";
   scope.library = libChecked ? Object.assign({ granted: true }, computeEndsAt(libTerm)) : { granted: false };
@@ -4558,6 +4761,7 @@ function collectScope() {
 function scopeHasAnything(scope) {
   return Object.keys(scope).some(function (key) {
     if (key === "library" || key === "my_calculations" || key === "access" || key === "statistics") return !!scope[key]?.granted;
+    if (scope[key] && scope[key].visible === true) return true;
     return Object.values(scope[key] || {}).some(function (item) { return item && item.granted; });
   });
 }
@@ -4572,12 +4776,12 @@ async function grantPlatformAccess() {
     message.style.color = ok ? "#8fe3a1" : "#ff9d9d";
   };
 
-  if (!userId) { setMsg("Сначала выберите пользователя.", false); return; }
+  if (!userId) { setMsg("Алдымен пайдаланушыны таңдаңыз.", false); return; }
 
   const scope = collectScope();
-  if (!scopeHasAnything(scope)) { setMsg("Отметьте хотя бы один пункт доступа.", false); return; }
+  if (!scopeHasAnything(scope)) { setMsg("Қолжетімділіктің кем дегенде бір тармағын белгілеңіз.", false); return; }
 
-  setMsg("Выдаю доступ...", true);
+  setMsg("Қолжетімділік беріп жатырмын...", true);
 
   const startsAt = new Date();
 
@@ -4644,10 +4848,10 @@ async function renderStatistics() {
   contentCards.innerHTML = `
     <div class="dashboard-wrap">
       <div class="dashboard-head">
-        <div><h2>Есептер мен статистика</h2><p>${isRealAdmin ? "Основные показатели платформы." : "Показатели по вашим ученикам/ученицам."}</p></div>
+        <div><h2>Есептер мен статистика</h2><p>${isRealAdmin ? "Платформаның негізгі көрсеткіштері." : "Сіздің оқушыларыңыз бойынша көрсеткіштер."}</p></div>
       </div>
       <div class="stats-grid" id="clientStats">
-        <div class="stat-card"><span>Всего ${isRealAdmin ? "клиенттер" : "оқушылар"}</span><strong>…</strong></div>
+        <div class="stat-card"><span>Барлық ${isRealAdmin ? "клиенттер" : "оқушылар"}</span><strong>…</strong></div>
         <div class="stat-card"><span>Айына жаңалар</span><strong>…</strong></div>
         <div class="stat-card"><span>Айына белсенділер</span><strong>…</strong></div>
       </div>
@@ -4676,9 +4880,11 @@ async function renderStatistics() {
 
   try {
     // ---- Клиенты/ученики и расчёты ----
-    let profilesQuery = supabaseClient.from("profiles").select("id, role, created_at");
+    let profilesQuery = supabaseClient.from("profiles").select("id, role, created_at, status");
     if (!isRealAdmin) profilesQuery = profilesQuery.eq("teacher_id", session.user.id);
-    const { data: clientProfiles } = await profilesQuery;
+    const { data: clientProfilesRaw } = await profilesQuery;
+    // Жойылған аккаунттар статистикада саналмайды.
+    const clientProfiles = (clientProfilesRaw || []).filter((p) => String(p.status || "").toLowerCase() !== "deleted");
     const clients = (clientProfiles || []).filter((p) => p.role !== "admin" && p.role !== "numerologist" || !isRealAdmin);
     const clientIds = new Set((isRealAdmin ? (clientProfiles || []) : clients).map((p) => p.id));
 
@@ -4700,7 +4906,7 @@ async function renderStatistics() {
     ).size;
 
     document.getElementById("clientStats").innerHTML = `
-      <div class="stat-card"><span>Всего ${isRealAdmin ? "клиенттер" : "оқушылар"}</span><strong>${isRealAdmin ? (clientProfiles || []).length : clients.length}</strong></div>
+      <div class="stat-card"><span>Барлық ${isRealAdmin ? "клиенттер" : "оқушылар"}</span><strong>${isRealAdmin ? (clientProfiles || []).length : clients.length}</strong></div>
       <div class="stat-card"><span>Айына жаңалар</span><strong>${newThisMonth}</strong></div>
       <div class="stat-card"><span>Айына белсенділер</span><strong>${activeThisMonth}</strong></div>`;
 
@@ -4766,7 +4972,8 @@ async function renderStatistics() {
       : `<div class="empty-table">Алдағы 7 күнде ешнәрсе аяқталмайды.</div>`;
 
     // ---- Рейтинг учителей ----
-    const { data: allProfilesFull } = await supabaseClient.from("profiles").select("id, first_name, last_name, email, role, teacher_id");
+    const { data: allProfilesFullRaw } = await supabaseClient.from("profiles").select("id, first_name, last_name, email, role, teacher_id, status");
+    const allProfilesFull = (allProfilesFullRaw || []).filter((p) => String(p.status || "").toLowerCase() !== "deleted");
     const teachers = (allProfilesFull || []).filter((p) => p.role === "numerologist");
     const teacherCounts = teachers.map((t) => ({
       id: t.id,
@@ -4798,7 +5005,7 @@ function renderTestStatsTable() {
         ${rows.map(a => `<tr>
           <td><a href="javascript:void(0)" style="color:#d7aa31;" onclick='showUserDetailModal(${JSON.stringify(a.user_id)})'>${escapeHtml(nameById[a.user_id] || a.user_id)}</a></td>
           <td>${escapeHtml(DIRECTION_NAMES[a.direction] || a.direction)}</td>
-          <td>${a.score} из ${a.total_questions}</td>
+          <td>${a.score} / ${a.total_questions}</td>
           <td>${new Date(a.completed_at).toLocaleDateString("ru-RU")}</td>
           <td><button type="button" class="material-manager-button" style="width:auto;padding:6px 10px;font-size:12px;" onclick='showTestAttemptDetail(${JSON.stringify(a.id)})'>Жауаптарды талдау</button></td>
         </tr>`).join("")}
@@ -4830,9 +5037,9 @@ async function showTestAttemptDetail(attemptId) {
     return `<div style="padding:10px 0;border-bottom:1px solid rgba(225,180,52,.18);">
       <div style="color:#f8e7a8;margin-bottom:6px;">${i + 1}. ${escapeHtml(q.question_text)}</div>
       <div style="font-size:13px;color:${isCorrect ? "#8fe3a1" : "#ff9d9d"};">
-        ${isCorrect ? "✓ Ответил(а) верно" : "✗ Ответил(а): " + escapeHtml(given ? optionLabel(q, given) : "—")}
+        ${isCorrect ? "✓ Дұрыс жауап берді" : "✗ Жауабы: " + escapeHtml(given ? optionLabel(q, given) : "—")}
       </div>
-      ${!isCorrect ? `<div style="font-size:13px;color:#8a8098;">Правильный ответ: ${escapeHtml(optionLabel(q, q.correct_option))}</div>` : ""}
+      ${!isCorrect ? `<div style="font-size:13px;color:#8a8098;">Дұрыс жауап: ${escapeHtml(optionLabel(q, q.correct_option))}</div>` : ""}
     </div>`;
   }).join("") + `</div>`;
 }
@@ -5064,6 +5271,22 @@ async function saveReferralContacts() {
   }
 }
 
+// Supabase қателері ағылшынша келеді — пайдаланушыға қазақша көрсетеміз
+function authErrorKz(error) {
+  const m = String((error && error.message) || error || "").toLowerCase();
+  if (m.includes("invalid login credentials")) return "Email немесе құпия сөз қате.";
+  if (m.includes("email not confirmed")) return "Email расталмаған. Поштаңыздағы хаттағы сілтеме арқылы растаңыз.";
+  if (m.includes("already registered") || m.includes("already been registered") || m.includes("already exists")) return "Бұл email бұрын тіркелген. Кіріңіз немесе құпия сөзді қалпына келтіріңіз.";
+  if (m.includes("rate limit") || m.includes("too many") || m.includes("security purposes")) return "Тым көп әрекет жасалды. Бірнеше минуттан кейін қайта көріңіз.";
+  if (m.includes("password should be") || m.includes("weak password")) return "Құпия сөз тым қарапайым. Кемінде 6 таңба енгізіңіз.";
+  if (m.includes("same as the old") || m.includes("different from the old")) return "Жаңа құпия сөз ескісінен өзгеше болуы керек.";
+  if (m.includes("invalid email") || m.includes("unable to validate email")) return "Email дұрыс емес.";
+  if (m.includes("expired") || m.includes("invalid") && m.includes("token")) return "Сілтеменің мерзімі өтті. Құпия сөзді қалпына келтіруді қайта сұратыңыз.";
+  if (m.includes("failed to fetch") || m.includes("network")) return "Интернет байланысын тексеріп, қайта көріңіз.";
+  if (m.includes("auth session missing")) return "Сессия табылмады. Поштаңыздағы сілтемені қайта ашыңыз.";
+  return "Қате орын алды. Кейінірек қайта көріңіз.";
+}
+
 async function showLanding() {
   if (window._landingContact === undefined) await fetchLandingContact();
   renderLandingPage();
@@ -5248,7 +5471,7 @@ function runTrialMatrix() {
     supabaseClient.rpc("log_trial", { p_code: refCode, p_name: name, p_birth: birthDate }).then(function () {}, function () {});
   } catch (e) { /* не мешаем расчёту */ }
   const blocks = res.rasshifrovka || [];
-  const card = blocks.find(b => /визитн/i.test(b.title)) || blocks[0];
+  const card = blocks.find(b => /визит/i.test(b.title)) || blocks[0];
   const locked = blocks.filter(b => b !== card).map(b => b.title)
     .concat(["Бағдарламалар", "Жылдар бойынша болжам", "Денсаулық картасы"]);
 
@@ -5317,7 +5540,7 @@ function showRegister(message = "") {
         <h2>Тіркелу</h2>
         <p class="auth-description">Аккаунт жасаңыз. Тіркелгеннен кейін бөлімдерге қолжетімділікті әкімші немесе ұстаз ашады.</p>
         <p class="auth-description" style="color:#f6d66c;font-size:14px;">
-          ⚠️ Указывайте email, которым вы пользуетесь регулярно — именно на него вам откроют доступ, запомните его.
+          ⚠️ Үнемі қолданатын email-іңізді көрсетіңіз — қолжетімділік дәл соған ашылады, оны есте сақтаңыз.
         </p>
         <div class="auth-grid">
           <input id="registerLastName" type="text" placeholder="Тегі *">
@@ -5342,11 +5565,11 @@ async function loginUser() {
   const errorBox = document.getElementById("loginError");
   if (errorBox) errorBox.textContent = "";
 
-  if (!email || !password) { if (errorBox) errorBox.textContent = "Введите email и пароль."; return; }
+  if (!email || !password) { if (errorBox) errorBox.textContent = "Email мен құпия сөзді енгізіңіз."; return; }
 
   const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error || !data?.user) {
-    if (errorBox) errorBox.textContent = "Email немесе құпия сөз қате.";
+    if (errorBox) errorBox.textContent = error ? authErrorKz(error) : "Email немесе құпия сөз қате.";
     return;
   }
   updateLastActivity();
@@ -5402,7 +5625,7 @@ async function registerUser() {
     }
   });
 
-  if (error) { setMessage(error.message || "Пайдаланушыны тіркеу мүмкін болмады."); return; }
+  if (error) { setMessage(authErrorKz(error)); return; }
 
   let teacherIdFound = null;
   if (data?.user && teacherCode) {
@@ -5423,10 +5646,10 @@ async function registerUser() {
   }
 
   if (data?.session) {
-    setMessage("Тіркелу завершена. Сейчас откроется платформа.", true);
+    setMessage("Тіркелу аяқталды. Қазір платформа ашылады.", true);
     setTimeout(() => location.reload(), 900);
   } else {
-    setMessage("Тіркелу создана. Подтвердите email и войдите. Қолжетімділік к разделам откроет әкімші или учитель.", true);
+    setMessage("Тіркелу жасалды. Email-іңізді растап, кіріңіз. Бөлімдерге қолжетімділікті әкімші немесе ұстаз ашады.", true);
   }
 }
 
@@ -5472,7 +5695,7 @@ async function sendPasswordReset() {
     if (message) { message.textContent = "Құпия сөзді қалпына келтіру сілтемесі поштаңызға жіберілді."; message.className = "auth-message success"; }
   } catch (error) {
     console.error("Қалпына келтіру қатесі:", error);
-    if (message) { message.textContent = error.message || "Хат жіберу мүмкін болмады."; message.className = "auth-message error"; }
+    if (message) { message.textContent = authErrorKz(error); message.className = "auth-message error"; }
   }
 }
 
@@ -5560,11 +5783,11 @@ async function submitNewPassword() {
   if (p1.length < 6) { setMsg("Құпия сөз кемінде 6 таңбадан тұруы керек.", false); return; }
   if (p1 !== p2) { setMsg("Құпия сөздер сәйкес келмейді.", false); return; }
 
-  setMsg("Сохраняю новый пароль...", true);
+  setMsg("Жаңа құпия сөзді сақтап жатырмын...", true);
   const { error } = await supabaseClient.auth.updateUser({ password: p1 });
-  if (error) { setMsg("Не удалось сохранить пароль: " + (error.message || "Supabase қатесі"), false); return; }
+  if (error) { setMsg("Құпия сөзді сақтау мүмкін болмады: " + authErrorKz(error), false); return; }
 
-  setMsg("Құпия сөз изменён. Сейчас откроется платформа.", true);
+  setMsg("Құпия сөз өзгертілді. Қазір платформа ашылады.", true);
   history.replaceState(null, "", window.location.pathname);
   setTimeout(() => location.reload(), 1000);
 }
@@ -5665,7 +5888,7 @@ async function checkAuth() {
 
   } catch (error) {
     console.error("Ошибка checkAuth:", error);
-    showLogin("Не удалось подключиться к платформе. Проверьте соединение и попробуйте ещё раз.");
+    showLogin("Платформаға қосылу мүмкін болмады. Байланысты тексеріп, қайта көріңіз.");
   }
 }
 
