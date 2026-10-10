@@ -3424,6 +3424,7 @@ async function loadDirectionMaterialsList() {
             <div class="material-row-meta">${meta}${date ? (meta ? " · " : "") + date : ""}</div>
           </div>
           <button class="material-row-open" onclick='openMaterialById(${JSON.stringify(item.id)})'>Ашу</button>
+          ${(!isLink && section !== "videos") ? `<button class="material-row-open" style="margin-left:8px;" onclick='downloadMaterialById(${JSON.stringify(item.id)})'>⬇ Жүктеп алу</button>` : ""}
           ${(window.currentUserRole === "admin" || item.created_by === window.currentUserId) ? `<button class="material-row-open" style="margin-left:8px;background:rgba(200,60,60,.35);" onclick='deleteMaterialById(${JSON.stringify(item.id)})' title="Жою">🗑</button>` : ""}
         </div>`;
     }).join("");
@@ -3451,6 +3452,28 @@ async function deleteMaterialById(id) {
   } catch (error) {
     console.error("Материалды жою қатесі:", error);
     customAlert("Материалды жою мүмкін болмады. " + (error.message || error));
+  }
+}
+
+async function downloadMaterialById(id) {
+  const item = currentDirectionMaterials.find(m => String(m.id) === String(id));
+  if (!item || !item.file_path) return;
+  try {
+    const fileName = item.title || item.file_path.split("/").pop();
+    const { data, error } = await supabaseClient.storage
+      .from(PLATFORM_STORAGE_BUCKET)
+      .createSignedUrl(item.file_path, 60 * 60, { download: fileName });
+    if (error) throw error;
+    if (!data?.signedUrl) throw new Error("Файлға сілтеме алу мүмкін болмады.");
+    const a = document.createElement("a");
+    a.href = data.signedUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (error) {
+    console.error("Материалды жүктеп алу қатесі:", error);
+    customAlert("Материалды жүктеп алу мүмкін болмады. " + (error.message || error));
   }
 }
 
