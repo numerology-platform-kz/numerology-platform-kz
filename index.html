@@ -579,7 +579,7 @@ const DIRECTIONS = [
   { key: "moonsun",       icon: "🌙",  title: "Ай және Күн<br>әдісі бойынша<br>болжау" },
   { key: "prognostika",   icon: "🔮",  title: "Прогностика" },
   { key: "karmic",        icon: "☯",   title: "Кармалық<br>нумерология" },
-  { key: "biorhythms",    icon: "📈",  title: "Биоырғақтар" },
+  { key: "biorhythms",    icon: "📈",  title: "Биоырғақтар<br>(биоритмы)" },
   { key: "codes",         icon: "💎",  title: "Махаббат,<br>миллионер,<br>қарызды өтеу<br>кодтары" }
 ];
 
@@ -2765,7 +2765,7 @@ function buildBiorhythmChartSvg(rows, cycles) {
     });
   });
   const legend = cycles.map(c => `<span style="white-space:nowrap;"><span style="display:inline-block;width:16px;height:3px;background:${BIO_COLORS[c.key]};vertical-align:middle;margin-right:5px;"></span>${c.name} (${c.period} күн)</span>`).join(" &nbsp; ")
-    + ` &nbsp; <span style="white-space:nowrap;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#f0a33c;vertical-align:middle;margin-right:5px;"></span>сыни күн</span>`;
+    + ` &nbsp; <span style="white-space:nowrap;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#f0a33c;vertical-align:middle;margin-right:5px;"></span>қауіпті күн (критический день)</span>`;
   return `
     <div style="max-width:720px;margin:10px auto 22px;text-align:center;">
       <div style="color:#f6d66c;font-family:PT Serif,Georgia,serif;font-size:16px;margin-bottom:6px;">Биоырғақтар: ${bioDateLabel(rows[0].date)} — ${bioDateLabel(rows[rows.length - 1].date)}</div>
@@ -2803,14 +2803,14 @@ function renderBiorhythmResult(name, birthDate, startDate, container) {
   blocks.push({
     title: "Күндер бойынша талдау",
     entries: rows.map(function (r) {
-      const marks = r.criticalCount === 3 ? " — үштік сыни күн" : r.criticalCount === 2 ? " — қос сыни күн" : r.criticalCount === 1 ? " — сыни күн" : "";
+      const marks = r.criticalCount === 3 ? " — үштік қауіпті күн" : r.criticalCount === 2 ? " — қос қауіпті күн" : r.criticalCount === 1 ? " — қауіпті күн" : "";
       const detail = E.BIO_CYCLES.map(function (c) { return c.name[0] + ": " + r[c.key].dayOfCycle + "-күн, " + (r[c.key].percent > 0 ? "+" : "") + r[c.key].percent + "%"; }).join("; ");
       return { number: bioDateLabel(r.date) + " (" + BIO_WEEKDAYS[r.date.getUTCDay()] + "), код " + r.code + marks, text: detail + "\n\n" + E.BIO_DAY_TEXTS[r.code] };
     })
   });
   blocks.push({
     title: "Күн кодын қалай оқу керек",
-    entries: [{ number: "", text: "Кодтың үш әрпі ретімен: физикалық, эмоционалдық, интеллектуалдық цикл.\nH — оң фаза, L — теріс фаза, X — сыни күн (фазаның ауысуы).\nСыни күндер: физикалық цикл — 1 және 12-күн, эмоционалдық — 1 және 15-күн, интеллектуалдық — 1 және 17-күн.\nБиоырғақтар оқиғаларды алдын ала белгілемейді, тек ықтимал көңіл-күйді көрсетеді." }]
+    entries: [{ number: "", text: "Кодтың үш әрпі ретімен: физикалық, эмоционалдық, интеллектуалдық цикл.\nH — оң фаза, L — теріс фаза, X — қауіпті күн (критический день — фазаның ауысуы).\nҚауіпті күндер: физикалық цикл — 1 және 12-күн, эмоционалдық — 1 және 15-күн, интеллектуалдық — 1 және 17-күн.\nБиоырғақтар оқиғаларды алдын ала белгілемейді, тек ықтимал көңіл-күйді көрсетеді." }]
   });
 
   renderEditableResult(blocks, container, "Биоырғақтар - " + name, birthDate + ", " + startDate + " бастап", "biorhythms");
