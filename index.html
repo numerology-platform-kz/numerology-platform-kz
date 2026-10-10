@@ -887,7 +887,7 @@ async function openCalculator(type) {
 
   document.body.innerHTML = `
     <div style="min-height:100vh;padding:40px;background:linear-gradient(135deg,#142b28,#1d3f3c,#142b28);color:#f8e7a8;font-family:Arial,sans-serif;">
-      <div style="max-width:${type === "moonsun" ? "1100px" : type === "adult" ? "900px" : "650px"};margin:0 auto;padding:35px;border:1px solid #d7aa31;border-radius:20px;background:linear-gradient(145deg,#24504c,#1c3a37);">
+      <div id="calcBox" style="max-width:650px;margin:0 auto;padding:35px;border:1px solid #d7aa31;border-radius:20px;background:linear-gradient(145deg,#24504c,#1c3a37);">
         <h1 style="margin-top:0;color:#f6d66c;font-family:PT Serif,Georgia,serif;font-weight:500;">${title}</h1>
 
         <label>Аты</label>
@@ -1035,6 +1035,10 @@ function calculate(type) {
   }
 
   if (!result) return;
+
+  // Форма у всех калькуляторов одной ширины; для широких результатов расширяем блок после расчёта.
+  const calcBox = document.getElementById("calcBox");
+  if (calcBox) calcBox.style.maxWidth = type === "moonsun" ? "1100px" : type === "adult" ? "900px" : "650px";
 
   if (type === "moonsun" && window.MoonSunTable) {
     renderMoonSunResult(name, birthDate, moonSunYear, result);
