@@ -4672,7 +4672,7 @@ async function applyTeacherCode() {
     const { data: teachers, error: teachersError } = await supabaseClient.from("profiles").select("id").eq("role", "numerologist");
     if (teachersError) throw teachersError;
     const match = (teachers || []).find(t => t.id.slice(0, 8).toUpperCase() === code);
-    if (!match) { setMsg("Мұндай коды бар Teacher табылмады. Кодты тексеріңіз.", false); return; }
+    if (!match) { setMsg("Мұндай коды бар ұстаз табылмады. Кодты тексеріңіз.", false); return; }
 
     const { error: updateError } = await supabaseClient.from("profiles").update({ teacher_id: match.id }).eq("id", session.user.id);
     if (updateError) throw updateError;
