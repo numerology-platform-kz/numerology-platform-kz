@@ -4930,15 +4930,17 @@ async function renderAccess() {
     </div>`;
 
   if (!isRealAdmin) {
-    const codeEl = document.getElementById("teacherOwnCode");
-    if (codeEl) {
+    try {
       const { data: { session } } = await supabaseClient.auth.getSession();
-      if (session) codeEl.textContent = session.user.id.slice(0, 8).toUpperCase();
-    }
-    // Подтягиваем уже сохранённое название школы, если оно было задано раньше.
-    const { data: mySchool } = await supabaseClient.from("schools").select("id, name").eq("owner_id", session.user.id).maybeSingle();
-    const schoolInput = document.getElementById("teacherSchoolNameInput");
-    if (schoolInput && mySchool?.name) schoolInput.value = mySchool.name;
+      const codeEl = document.getElementById("teacherOwnCode");
+      if (codeEl && session) codeEl.textContent = session.user.id.slice(0, 8).toUpperCase();
+      // Подтягиваем уже сохранённое название школы, если оно было задано раньше.
+      if (session) {
+        const { data: mySchool } = await supabaseClient.from("schools").select("id, name").eq("owner_id", session.user.id).maybeSingle();
+        const schoolInput = document.getElementById("teacherSchoolNameInput");
+        if (schoolInput && mySchool?.name) schoolInput.value = mySchool.name;
+      }
+    } catch (e) { console.warn("Ұстаз деректері жүктелмеді:", e); }
   }
 
   await loadAdminUsers();
