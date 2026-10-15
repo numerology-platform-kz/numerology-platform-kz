@@ -6394,6 +6394,9 @@ async function registerUser() {
 
   setMessage("Аккаунт жасап жатырмын...", true);
 
+  // Егер бұл email жойылған аккаунтқа тиесілі болса — ескі аккаунтты толық өшіріп, жаңа тіркелуге жол береміз
+  try { await supabaseClient.rpc("release_deleted_email", { p_email: email }); } catch (e) { console.warn("release_deleted_email:", e); }
+
   const { data, error } = await supabaseClient.auth.signUp({
     email, password,
     options: {
@@ -6403,6 +6406,12 @@ async function registerUser() {
   });
 
   if (error) { setMessage(authErrorKz(error)); return; }
+
+  // Email бұрын тіркелген (белсенді аккаунт) — Supabase бұл жағдайда хат жібермейді
+  if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    setMessage("Бұл email бұрын тіркелген — жай ғана кіріңіз. Құпия сөзді ұмытсаңыз, «Құпия сөзді ұмыттыңыз ба?» батырмасын басыңыз.");
+    return;
+  }
 
   let teacherIdFound = null;
   if (data?.user && teacherCode) {
