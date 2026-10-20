@@ -2540,7 +2540,7 @@ function downloadHtmlFile(filename, htmlBody) {
 
   // На телефоне печать из скрытого окошка не срабатывает — открываем расчёт
   // в новой вкладке с кнопкой сохранения в PDF.
-  if (isPhoneDevice()) { openMobilePrintWindow(fullHtml, title, filename, htmlBody); return; }
+  if (isPhoneDevice()) { makeMobilePdf(fullHtml, title, filename, htmlBody); return; }
 
   // Печать через скрытый iframe — родной движок печати браузера. Это ЕДИНСТВЕННЫЙ
   // вариант из всех опробованных, который стабильно давал корректный, читаемый
@@ -2595,6 +2595,164 @@ function downloadHtmlFile(filename, htmlBody) {
 function isPhoneDevice() {
   const ua = navigator.userAgent || "";
   return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
+
+// ===== Телефон: готовый PDF-файл прямо на устройстве (без печати) =====
+function loadScriptOnce(src) {
+  return new Promise(function (resolve, reject) {
+    if (document.querySelector('script[data-src="' + src + '"]')) { resolve(); return; }
+    const sc = document.createElement("script");
+    sc.src = src; sc.async = true; sc.setAttribute("data-src", src);
+    sc.onload = function () { resolve(); };
+    sc.onerror = function () { reject(new Error("load " + src)); };
+    document.head.appendChild(sc);
+  });
+}
+
+function mobilePdfOverlay(html) {
+  let ov = document.getElementById("mobPdfOverlay");
+  if (!ov) {
+    ov = document.createElement("div");
+    ov.id = "mobPdfOverlay";
+    ov.style.cssText = "position:fixed;inset:0;z-index:100000;background:rgba(10,20,18,.82);display:flex;align-items:center;justify-content:center;padding:20px;font-family:Arial,sans-serif;";
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = `<div style="max-width:420px;width:100%;background:#24504c;border:1px solid #d7aa31;border-radius:16px;padding:24px;text-align:center;color:#f8e7a8;">${html}</div>`;
+  return ov;
+}
+
+async function makeMobilePdf(fullHtml, title, filename, htmlBody) {
+  const pdfName = filename.replace(/\.(html|pdf)$/i, "") + ".pdf";
+  const setStatus = function (t) { mobilePdfOverlay(`<div style="font-size:17px;margin-bottom:8px;">PDF файл дайындалуда...</div><div style="color:#c9bfa8;font-size:14px;">${t || ""}</div>`); };
+  setStatus("");
+  let iframe = null;
+  try {
+    await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+    await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+
+    const W = 760;
+    iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;left:-20000px;top:0;width:" + W + "px;height:1200px;border:0;visibility:hidden;";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow.document;
+    const extra = `<style>html,body{width:${W}px;margin:0;background:#fff;} .doc-wrap{max-width:${W}px !important;padding:24px 28px !important;}</style>`;
+    await new Promise(function (resolve) {
+      iframe.onload = resolve;
+      doc.open(); doc.write(fullHtml.replace("</head>", extra + "</head>")); doc.close();
+      setTimeout(resolve, 2500);
+    });
+    try { await Promise.race([doc.fonts.ready, new Promise(r => setTimeout(r, 2500))]); } catch (e) { /* не критично */ }
+
+    const H = Math.ceil(doc.documentElement.scrollHeight);
+    iframe.style.height = H + "px";
+    await new Promise(r => setTimeout(r, 50));
+
+    // Где можно резать страницы: не посередине строки текста, строки таблицы или картинки.
+    const BLOCK = { block: 1, flex: 1, grid: 1, table: 1, "table-row": 1, "list-item": 1, "table-row-group": 1, "table-header-group": 1 };
+    const intervals = [];
+    const forced = [];
+    const win = iframe.contentWindow;
+    (function walk(el) {
+      const tag = el.tagName ? el.tagName.toLowerCase() : "";
+      const cs = win.getComputedStyle(el);
+      if (cs.display === "none") return;
+      const r = el.getBoundingClientRect();
+      if (cs.breakAfter === "page" || cs.pageBreakAfter === "always") forced.push(r.bottom);
+      if (["svg", "img", "canvas", "tr", "h1", "h2", "h3"].includes(tag)) { if (r.height > 0) intervals.push([r.top, r.bottom]); return; }
+      const kids = Array.from(el.children).filter(c => BLOCK[win.getComputedStyle(c).display]);
+      if (!kids.length) { if (r.height > 0 && el !== doc.body) intervals.push([r.top, r.bottom]); }
+      Array.from(el.children).forEach(walk);
+    })(doc.body);
+    intervals.sort((a, b) => a[0] - b[0]);
+    const merged = [];
+    intervals.forEach(function (iv) {
+      const last = merged[merged.length - 1];
+      if (last && iv[0] < last[1] - 0.5) last[1] = Math.max(last[1], iv[1]); else merged.push([iv[0], iv[1]]);
+    });
+
+    const MARGIN = 10; // мм
+    const PW = 210 - 2 * MARGIN, PH = 297 - 2 * MARGIN;
+    const pageH = Math.floor(W * PH / PW);
+    const pages = [];
+    let y0 = 0;
+    while (y0 < H - 2) {
+      const limit = y0 + pageH;
+      let cut = Math.min(limit, H);
+      if (limit < H) {
+        let best = null;
+        for (let i = 0; i < merged.length; i++) {
+          if (merged[i][1] > y0 + 40 && merged[i][1] <= limit) best = merged[i][1];
+          if (merged[i][0] > limit) break;
+        }
+        if (best) cut = Math.ceil(best) + 2;
+      }
+      const f = forced.filter(v => v > y0 + 40 && v < cut).sort((a, b) => a - b)[0];
+      if (f) cut = Math.ceil(f) + 1;
+      pages.push([y0, Math.min(cut, H)]);
+      y0 = cut;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait", compress: true });
+    const SCALE = 1.5;
+    const MAX_CHUNK = 5200;
+    let p = 0;
+    while (p < pages.length) {
+      let q = p, top = pages[p][0];
+      while (q + 1 < pages.length && pages[q + 1][1] - top <= MAX_CHUNK) q++;
+      const bottom = pages[q][1];
+      setStatus((q + 1) + " / " + pages.length + " бет");
+      const canvas = await html2canvas(doc.body, {
+        x: 0, y: top, width: W, height: bottom - top, scale: SCALE,
+        windowWidth: W, windowHeight: H, scrollX: 0, scrollY: 0,
+        backgroundColor: "#ffffff", useCORS: true, logging: false,
+      });
+      for (let i = p; i <= q; i++) {
+        const ph = pages[i][1] - pages[i][0];
+        const c = document.createElement("canvas");
+        c.width = Math.round(W * SCALE); c.height = Math.max(1, Math.round(ph * SCALE));
+        const ctx = c.getContext("2d");
+        ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(canvas, 0, Math.round((pages[i][0] - top) * SCALE), c.width, c.height, 0, 0, c.width, c.height);
+        if (i > 0) pdf.addPage();
+        pdf.addImage(c.toDataURL("image/jpeg", 0.78), "JPEG", MARGIN, MARGIN, PW, PW * ph / W);
+      }
+      p = q + 1;
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    const blob = pdf.output("blob");
+    const file = new File([blob], pdfName, { type: "application/pdf" });
+    window._mobPdf = { blob: blob, file: file, name: pdfName };
+    const canShare = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+    const btn = "display:block;width:100%;padding:14px;margin-top:10px;border-radius:10px;font-size:16px;cursor:pointer;";
+    mobilePdfOverlay(`<div style="font-size:18px;color:#f6d66c;margin-bottom:6px;">✅ PDF файл дайын</div>
+      <div style="color:#c9bfa8;font-size:13px;margin-bottom:8px;word-break:break-word;">${pdfName.replace(/[<>]/g, "")}</div>
+      ${canShare ? `<button type="button" onclick="shareMobilePdf()" style="${btn}border:1px solid #d7aa31;background:#f6d66c;color:#1c332f;font-weight:700;">📤 Жіберу (WhatsApp, Telegram...)</button>` : ""}
+      <button type="button" onclick="saveMobilePdf()" style="${btn}border:1px solid #d7aa31;background:linear-gradient(90deg,#3c8783,#2f6d6a);color:#f8d96d;">⬇️ Телефонға сақтау</button>
+      <button type="button" onclick="document.getElementById('mobPdfOverlay').remove()" style="${btn}border:none;background:none;color:#c9bfa8;font-size:14px;">Жабу</button>`);
+  } catch (error) {
+    console.error("PDF:", error);
+    const ov = document.getElementById("mobPdfOverlay"); if (ov) ov.remove();
+    customAlert("PDF жасау мүмкін болмады. Қайталап көріңіз.");
+  } finally {
+    if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
+  }
+}
+
+async function shareMobilePdf() {
+  const d = window._mobPdf; if (!d) return;
+  try { await navigator.share({ files: [d.file], title: d.name }); }
+  catch (e) { if (!e || e.name !== "AbortError") saveMobilePdf(); }
+}
+
+function saveMobilePdf() {
+  const d = window._mobPdf; if (!d) return;
+  const url = URL.createObjectURL(d.blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = d.name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function openMobilePrintWindow(fullHtml, title, filename, htmlBody) {
