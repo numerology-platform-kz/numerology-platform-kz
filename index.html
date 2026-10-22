@@ -2631,6 +2631,7 @@ async function makeMobilePdf(fullHtml, title, filename, htmlBody) {
   if (btn) { if (btn.dataset.busy === "1") return; btn.dataset.busy = "1"; btn.disabled = true; btn.innerHTML = "Жүктелуде…"; }
   const setStatus = function () {};
   let iframe = null;
+  let jobDone; window._pdfJob = new Promise(function (r) { jobDone = r; });
   try {
     await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
     await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
@@ -2657,17 +2658,38 @@ async function makeMobilePdf(fullHtml, title, filename, htmlBody) {
     const intervals = [];
     const forced = [];
     const win = iframe.contentWindow;
+    const headings = [];
     (function walk(el) {
       const tag = el.tagName ? el.tagName.toLowerCase() : "";
       const cs = win.getComputedStyle(el);
       if (cs.display === "none") return;
       const r = el.getBoundingClientRect();
       if (cs.breakAfter === "page" || cs.pageBreakAfter === "always") forced.push(r.bottom);
-      if (["svg", "img", "canvas", "tr", "h1", "h2", "h3"].includes(tag)) { if (r.height > 0) intervals.push([r.top, r.bottom]); return; }
+      if (["svg", "img", "canvas", "tr", "table"].includes(tag)) { if (r.height > 0) intervals.push([r.top, r.bottom]); return; }
+      const isHead = ["h1", "h2", "h3", "h4"].includes(tag) || (el.classList && (el.classList.contains("num") || el.classList.contains("accordion-header")));
+      if (isHead) { if (r.height > 0) { intervals.push([r.top, r.bottom]); headings.push([r.top, r.bottom]); } return; }
       const kids = Array.from(el.children).filter(c => BLOCK[win.getComputedStyle(c).display]);
-      if (!kids.length) { if (r.height > 0 && el !== doc.body) intervals.push([r.top, r.bottom]); }
+      if (!kids.length) {
+        if (r.height > 0 && el !== doc.body) {
+          // режем только между строками текста, а не по целому блоку — так не остаётся пустых полстраницы
+          let added = false;
+          try {
+            const rng = doc.createRange(); rng.selectNodeContents(el);
+            Array.from(rng.getClientRects()).forEach(function (lr) { if (lr.height > 0) { intervals.push([lr.top, lr.bottom]); added = true; } });
+          } catch (e) { /* ignore */ }
+          if (!added) intervals.push([r.top, r.bottom]);
+          if (el.querySelector && el.querySelector("svg,img,canvas,table")) intervals.push([r.top, r.bottom]);
+        }
+        return;
+      }
       Array.from(el.children).forEach(walk);
     })(doc.body);
+    // заголовок не оставляем внизу страницы отдельно от текста под ним
+    intervals.sort((a, b) => a[0] - b[0]);
+    headings.forEach(function (h) {
+      const next = intervals.find(iv => iv[0] >= h[1] - 1 && !(iv[0] === h[0] && iv[1] === h[1]));
+      if (next) intervals.push([h[0], next[1]]);
+    });
     intervals.sort((a, b) => a[0] - b[0]);
     const merged = [];
     intervals.forEach(function (iv) {
@@ -2736,6 +2758,7 @@ async function makeMobilePdf(fullHtml, title, filename, htmlBody) {
   } finally {
     if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
     if (btn) { btn.innerHTML = btnLabel; btn.disabled = false; btn.dataset.busy = ""; }
+    if (jobDone) jobDone();
   }
 }
 
@@ -4802,13 +4825,35 @@ async function renderMyCalculations() {
 }
 
 async function reopenCalculation(r) {
+  // Скачивание из «Моих расчётов»: расчёт собирается незаметно в фоне,
+  // на экране остаётся список расчётов — сразу появляется окно сохранения файла.
+  if (window._reopenBusy) return;
+  window._reopenBusy = true;
   window._skipHistorySave = true;
+  const link = (window.event && window.event.target && window.event.target.closest) ? window.event.target.closest("a,button") : null;
+  const linkLabel = link ? link.innerHTML : null;
+  if (link) link.innerHTML = "Жүктелуде…";
+  const savedNodes = Array.from(document.body.childNodes);
+  const savedScroll = window.scrollY;
+  const host = document.createElement("div");
+  host.id = "bgCalcHost";
+  host.setAttribute("aria-hidden", "true");
+  host.style.cssText = "position:fixed;left:-20000px;top:0;width:1100px;pointer-events:none;";
+  const realScrollTo = window.scrollTo;
   try {
+    window.scrollTo = function () {};
     await openCalculator(r.direction);
+    // калькулятор переносим в скрытый блок, а список расчётов возвращаем на экран
+    const calcNodes = Array.from(document.body.childNodes);
+    document.body.innerHTML = "";
+    savedNodes.forEach(n => document.body.appendChild(n));
+    calcNodes.forEach(n => host.appendChild(n));
+    document.body.appendChild(host);
+    realScrollTo.call(window, 0, savedScroll);
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
     if (r.direction === "pythagoras" || r.direction === "codes") {
-      const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
       set("pythLastName", r.last_name);
       set("pythFirstName", r.first_name);
       set("pythPatronymic", r.patronymic);
@@ -4816,24 +4861,29 @@ async function reopenCalculation(r) {
       set("birthDate", r.birth_date);
       if (r.direction === "codes") calculateCodes(); else calculatePythagoras();
     } else if (r.direction === "compatibility") {
-      const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
       set("birthDate1", r.birth_date);
       set("birthDate2", r.birth_date2);
       calculateCompatibility();
     } else {
-      const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
       set("name", r.person_name);
       set("birthDate", r.birth_date);
       calculate(r.direction);
     }
-
-    // Иәём результату отрисоваться и сразу запускаем скачивание — из истории
-    // человек хочет именно скачать сохранённый расчёт, а не просто посмотреть его на экране.
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     await new Promise(resolve => setTimeout(resolve, 150));
-    document.getElementById("calcDownloadBtn")?.click();
+    window._pdfJob = null;
+    const dl = host.querySelector("#calcDownloadBtn");
+    if (dl) dl.click();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    if (window._pdfJob) await window._pdfJob;
+  } catch (e) {
+    console.error(e);
   } finally {
+    window.scrollTo = realScrollTo;
+    if (host.parentNode) host.parentNode.removeChild(host);
+    if (link) link.innerHTML = linkLabel;
     window._skipHistorySave = false;
+    window._reopenBusy = false;
   }
 }
 
