@@ -5331,6 +5331,18 @@ async function loadAdminUsers() {
   const teacherNumber = {};
   teachersSorted.forEach((t, i) => { teacherNumber[t.id] = i + 1; });
 
+  // Әкімшіге ғана: email-ін растамаған пайдаланушылар
+  let unconfirmed = new Set();
+  if (isRealAdmin) {
+    try {
+      const { data: uc } = await supabaseClient.rpc("admin_unconfirmed_users");
+      (uc || []).forEach(function (row) { unconfirmed.add(typeof row === "string" ? row : (row.admin_unconfirmed_users || row.id)); });
+    } catch (e) { console.warn("Растамаған email тізімі жүктелмеді:", e); }
+  }
+  const emailBadge = (user) => (isRealAdmin && unconfirmed.has(user.id))
+    ? `<div style="margin-top:6px;"><span style="color:#ffb27a;font-size:12px;">Email расталмаған</span> <button type="button" class="material-manager-button" style="width:auto;padding:4px 10px;font-size:12px;margin-left:6px;" onclick='adminConfirmEmail(${JSON.stringify(user.id)}, ${JSON.stringify(nameOf(user))}, this)'>Растау</button></div>`
+    : "";
+
   box.innerHTML = backLink + `
     <div style="overflow-x:auto;">
     <table class="data-table">
@@ -5345,7 +5357,7 @@ async function loadAdminUsers() {
             <td>${escapeHtml(roleLabel(user.role))}</td>
             <td>${user.created_at ? new Date(user.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}${user.restored_at ? " / " + new Date(user.restored_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}</td>
             ${isRealAdmin ? `${codeCell}<td>${user.role === "student" ? escapeHtml(teacherName(user.teacher_id)) : "—"}</td>` : ""}
-            <td>${statusLabel(user.status)}${user.restored_at ? ` <span style="color:#8fd18f;font-size:11px;">(қалпына келтірілді ${new Date(user.restored_at).toLocaleDateString("ru-RU")})</span>` : ""}${accessBadge(user)}</td>
+            <td>${statusLabel(user.status)}${user.restored_at ? ` <span style="color:#8fd18f;font-size:11px;">(қалпына келтірілді ${new Date(user.restored_at).toLocaleDateString("ru-RU")})</span>` : ""}${accessBadge(user)}${emailBadge(user)}</td>
             ${user.role === "admin" ? (isRealAdmin ? "<td>—</td>" : "") : `<td><button type="button" class="material-manager-button" style="width:auto;padding:6px 10px;font-size:12px;" onclick='deleteUserAccount(${JSON.stringify(user.id)}, ${JSON.stringify(nameOf(user))})'>Жою</button></td>`}
           </tr>`;
         }).join("")}
@@ -5354,6 +5366,21 @@ async function loadAdminUsers() {
     </div>`;
 
   loadDeletedUsersLog();
+}
+
+async function adminConfirmEmail(userId, name, btn) {
+  if (!(await customConfirm("«" + name + "» пайдаланушысының email-ін растау керек пе? Осыдан кейін ол өз құпия сөзімен бірден кіре алады."))) return;
+  if (btn) { btn.disabled = true; btn.textContent = "..."; }
+  try {
+    const { data, error } = await supabaseClient.rpc("admin_confirm_email", { p_user: userId });
+    if (error) throw error;
+    const wrap = btn ? btn.parentElement : null;
+    if (wrap) wrap.innerHTML = `<span style="color:#8fd18f;font-size:12px;">✓ Email расталды</span>`;
+  } catch (e) {
+    console.error(e);
+    if (btn) { btn.disabled = false; btn.textContent = "Растау"; }
+    customAlert("Email-ді растау мүмкін болмады: " + (e.message || e));
+  }
 }
 
 function scrollToGrantAccess(userId) {
