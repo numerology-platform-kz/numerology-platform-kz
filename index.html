@@ -4676,7 +4676,7 @@ async function loadDirectionMaterialsList() {
       const icon = isLink ? "🔗" : (section === "videos" ? "▶" : "📄");
       const label = isLink ? "Сілтеме" : (item.title || (section === "videos" ? "Бейнефайл" : "Файл"));
       const meta = isLink ? escapeHtml(item.url || "") : "";
-      const date = item.created_at ? new Date(item.created_at).toLocaleDateString("ru-RU") : "";
+      const date = (item.created_at && (section !== "manuals" || window.currentUserRole === "admin")) ? new Date(item.created_at).toLocaleDateString("ru-RU") : "";
       return `
         <div class="material-row">
           <div class="material-row-icon">${icon}</div>
