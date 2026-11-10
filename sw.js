@@ -1,4 +1,4 @@
-const CACHE_NAME = "numerology-kz-v1";
+const CACHE_NAME = "numerology-kz-v2";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -14,8 +14,11 @@ self.addEventListener("activate", (event) => {
 });
 
 // Простая стратегия: сначала пробуем сеть, если нет связи — отдаём то, что уже закешировано.
+// Перехватываем только файлы самого сайта. Запросы к базе (Supabase) и к CDN идут напрямую:
+// Safari на iPhone/iPad иногда обрывает такие запросы через Service Worker с ошибкой «Load failed».
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  if (new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
     fetch(event.request)
       .then((response) => {

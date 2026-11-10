@@ -6745,6 +6745,30 @@ async function saveReferralContacts() {
   }
 }
 
+// Желі қатесі: Chrome «Failed to fetch», Safari «Load failed», Firefox «NetworkError» деп жазады
+function isNetworkError(error) {
+  const m = String((error && (error.message || error.name)) || error || "").toLowerCase();
+  return m.includes("failed to fetch") || m.includes("load failed") || m.includes("network") || m.includes("fetch")
+    || m.includes("timeout") || m.includes("timed out") || m.includes("aborted") || m.includes("connection")
+    || (error && (error.status === 0 || error.name === "AuthRetryableFetchError" || error.name === "TypeError"));
+}
+// Байланыс үзілсе, кіруді автоматты түрде тағы 2 рет қайталаймыз
+async function withNetworkRetry(fn, tries = 3) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fn();
+      if (res && res.error && isNetworkError(res.error) && i < tries - 1) { last = res; await new Promise(r => setTimeout(r, 1200 * (i + 1))); continue; }
+      return res;
+    } catch (e) {
+      last = { data: null, error: e };
+      if (!isNetworkError(e) || i === tries - 1) return last;
+      await new Promise(r => setTimeout(r, 1200 * (i + 1)));
+    }
+  }
+  return last;
+}
+
 // Supabase қателері ағылшынша келеді — пайдаланушыға қазақша көрсетеміз
 function authErrorKz(error) {
   const m = String((error && error.message) || error || "").toLowerCase();
@@ -6756,7 +6780,7 @@ function authErrorKz(error) {
   if (m.includes("same as the old") || m.includes("different from the old")) return "Жаңа құпия сөз ескісінен өзгеше болуы керек.";
   if (m.includes("invalid email") || m.includes("unable to validate email")) return "Email дұрыс емес.";
   if (m.includes("expired") || m.includes("invalid") && m.includes("token")) return "Сілтеменің мерзімі өтті. Құпия сөзді қалпына келтіруді қайта сұратыңыз.";
-  if (m.includes("failed to fetch") || m.includes("network")) return "Интернет байланысын тексеріп, қайта көріңіз.";
+  if (isNetworkError(error)) return "Серверге қосылу мүмкін болмады. Интернетті тексеріңіз; VPN немесе жарнама бұғаттағыш (блокировщик рекламы) қосулы болса, өшіріп, қайта көріңіз.";
   if (m.includes("auth session missing")) return "Сессия табылмады. Поштаңыздағы сілтемені қайта ашыңыз.";
   return "Қате орын алды. Кейінірек қайта көріңіз.";
 }
@@ -7040,7 +7064,13 @@ async function loginUser() {
 
   if (!email || !password) { if (errorBox) errorBox.textContent = "Email мен құпия сөзді енгізіңіз."; return; }
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  const btn = document.querySelector('button[onclick="loginUser()"]');
+  if (btn) { btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = "..."; }
+  // Ескі сақталған сессия кіруге кедергі жасамауы үшін алдымен оны тек осы құрылғыда тазалаймыз
+  try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (e) {}
+  const { data, error } = await withNetworkRetry(() => supabaseClient.auth.signInWithPassword({ email, password }));
+  if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || "Кіру"; }
+  if (error) console.error("Кіру қатесі:", error);
   if (error || !data?.user) {
     if (errorBox) errorBox.textContent = error ? authErrorKz(error) : "Email немесе құпия сөз қате.";
     return;
@@ -7378,7 +7408,7 @@ document.addEventListener("DOMContentLoaded", checkAuth);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch((error) => console.error("Service Worker тіркеу қатесі:", error));
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch((error) => console.error("Service Worker тіркеу қатесі:", error));
   });
 }
 </script>
